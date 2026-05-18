@@ -7,7 +7,7 @@ def apply_styles():
         background-color: #050505;
         color: white;
     }
-
+a
     [data-testid="stSidebar"] {
         background-color: #111111;
     }
