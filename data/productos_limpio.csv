@@ -1,0 +1,131 @@
+Product_id,Product_name,Category,Subcategory,Static_price
+1,Tops Product 1,Fitness Wear,Tops,35.16
+2,Tops Product 2,Fitness Wear,Tops,40.46
+3,Tops Product 3,Fitness Wear,Tops,25.09
+4,Tops Product 4,Fitness Wear,Tops,39.27
+5,Tops Product 5,Fitness Wear,Tops,52.03
+6,Tops Product 6,Fitness Wear,Tops,33.76
+7,Tops Product 7,Fitness Wear,Tops,45.98
+8,Tops Product 8,Fitness Wear,Tops,44.58
+9,Tops Product 9,Fitness Wear,Tops,46.5
+10,Tops Product 10,Fitness Wear,Tops,51.76
+11,Tops Product 11,Fitness Wear,Tops,59.14
+12,Bottoms Product 12,Fitness Wear,Bottoms,76.32
+13,Bottoms Product 13,Fitness Wear,Bottoms,82.4
+14,Bottoms Product 14,Fitness Wear,Bottoms,38.17
+15,Bottoms Product 15,Fitness Wear,Bottoms,82.97
+16,Bottoms Product 16,Fitness Wear,Bottoms,44.74
+17,Bottoms Product 17,Fitness Wear,Bottoms,73.41
+18,Bottoms Product 18,Fitness Wear,Bottoms,88.44
+19,Bottoms Product 19,Fitness Wear,Bottoms,88.52
+20,Bottoms Product 20,Fitness Wear,Bottoms,49.4
+21,Bottoms Product 21,Fitness Wear,Bottoms,61.44
+22,Bottoms Product 22,Fitness Wear,Bottoms,37.2
+23,Outerwear Product 23,Fitness Wear,Outerwear,84.56
+24,Outerwear Product 24,Fitness Wear,Outerwear,88.37
+25,Outerwear Product 25,Fitness Wear,Outerwear,129.94
+26,Outerwear Product 26,Fitness Wear,Outerwear,78.05
+27,Outerwear Product 27,Fitness Wear,Outerwear,101.02
+28,Outerwear Product 28,Fitness Wear,Outerwear,62.9
+29,Outerwear Product 29,Fitness Wear,Outerwear,71.46
+30,Outerwear Product 30,Fitness Wear,Outerwear,110.55
+31,Outerwear Product 31,Fitness Wear,Outerwear,84.5
+32,Outerwear Product 32,Fitness Wear,Outerwear,175.69
+33,Outerwear Product 33,Fitness Wear,Outerwear,149.91
+34,Shirts Product 34,Casual Wear,Shirts,29.32
+35,Shirts Product 35,Casual Wear,Shirts,58.33
+36,Shirts Product 36,Casual Wear,Shirts,52.53
+37,Shirts Product 37,Casual Wear,Shirts,64.59
+38,Shirts Product 38,Casual Wear,Shirts,39.84
+39,Shirts Product 39,Casual Wear,Shirts,45.4
+40,Shirts Product 40,Casual Wear,Shirts,35.72
+41,Shirts Product 41,Casual Wear,Shirts,22.24
+42,Shirts Product 42,Casual Wear,Shirts,42.82
+43,Shirts Product 43,Casual Wear,Shirts,32.86
+44,Shirts Product 44,Casual Wear,Shirts,51.84
+45,Pants Product 45,Casual Wear,Pants,53.8
+46,Pants Product 46,Casual Wear,Pants,87.1
+47,Pants Product 47,Casual Wear,Pants,57.39
+48,Pants Product 48,Casual Wear,Pants,52.56
+49,Pants Product 49,Casual Wear,Pants,46.41
+50,Pants Product 50,Casual Wear,Pants,78.81
+51,Pants Product 51,Casual Wear,Pants,39.24
+52,Pants Product 52,Casual Wear,Pants,99.43
+53,Pants Product 53,Casual Wear,Pants,67.37
+54,Pants Product 54,Casual Wear,Pants,81.63
+55,Pants Product 55,Casual Wear,Pants,58.62
+56,Dresses Product 56,Casual Wear,Dresses,101.15
+57,Dresses Product 57,Casual Wear,Dresses,53.35
+58,Dresses Product 58,Casual Wear,Dresses,99.96
+59,Dresses Product 59,Casual Wear,Dresses,126.03
+60,Dresses Product 60,Casual Wear,Dresses,114.07
+61,Dresses Product 61,Casual Wear,Dresses,85.15
+62,Dresses Product 62,Casual Wear,Dresses,149.11
+63,Dresses Product 63,Casual Wear,Dresses,58.97
+64,Dresses Product 64,Casual Wear,Dresses,80.44
+65,Dresses Product 65,Casual Wear,Dresses,75.62
+66,Dresses Product 66,Casual Wear,Dresses,112.6
+67,Bags Product 67,Accessories,Bags,172.91
+68,Bags Product 68,Accessories,Bags,95.67
+69,Bags Product 69,Accessories,Bags,88.12
+70,Bags Product 70,Accessories,Bags,72.41
+71,Bags Product 71,Accessories,Bags,180.4
+72,Bags Product 72,Accessories,Bags,106.76
+73,Bags Product 73,Accessories,Bags,84.19
+74,Jewelry Product 74,Accessories,Jewelry,72.6
+75,Jewelry Product 75,Accessories,Jewelry,79.43
+76,Jewelry Product 76,Accessories,Jewelry,129.37
+77,Jewelry Product 77,Accessories,Jewelry,134.22
+78,Jewelry Product 78,Accessories,Jewelry,25.26
+79,Jewelry Product 79,Accessories,Jewelry,26.48
+80,Jewelry Product 80,Accessories,Jewelry,104.5
+81,Hats Product 81,Accessories,Hats,59.15
+82,Hats Product 82,Accessories,Hats,48.67
+83,Hats Product 83,Accessories,Hats,42.4
+84,Hats Product 84,Accessories,Hats,44.88
+85,Hats Product 85,Accessories,Hats,31.41
+86,Hats Product 86,Accessories,Hats,37.69
+87,Hats Product 87,Accessories,Hats,52.95
+88,Belts Product 88,Accessories,Belts,61.74
+89,Belts Product 89,Accessories,Belts,48.72
+90,Belts Product 90,Accessories,Belts,21.99
+91,Belts Product 91,Accessories,Belts,54.66
+92,Belts Product 92,Accessories,Belts,38.6
+93,Belts Product 93,Accessories,Belts,48.44
+94,Belts Product 94,Accessories,Belts,51.73
+95,Sneakers Product 95,Footwear,Sneakers,87.85
+96,Sneakers Product 96,Footwear,Sneakers,195.55
+97,Sneakers Product 97,Footwear,Sneakers,148.15
+98,Sneakers Product 98,Footwear,Sneakers,66.91
+99,Sneakers Product 99,Footwear,Sneakers,131.12
+100,Sneakers Product 100,Footwear,Sneakers,85.61
+101,Sneakers Product 101,Footwear,Sneakers,100.09
+102,Sneakers Product 102,Footwear,Sneakers,152.46
+103,Sneakers Product 103,Footwear,Sneakers,159.05
+104,Sneakers Product 104,Footwear,Sneakers,98.67
+105,Boots Product 105,Footwear,Boots,143.41
+106,Boots Product 106,Footwear,Boots,130.67
+107,Boots Product 107,Footwear,Boots,231.68
+108,Boots Product 108,Footwear,Boots,196.11
+109,Boots Product 109,Footwear,Boots,141.47
+110,Boots Product 110,Footwear,Boots,131.46
+111,Boots Product 111,Footwear,Boots,159.47
+112,Boots Product 112,Footwear,Boots,128.67
+113,Boots Product 113,Footwear,Boots,88.06
+114,Boots Product 114,Footwear,Boots,208.56
+115,Sandals Product 115,Footwear,Sandals,35.12
+116,Sandals Product 116,Footwear,Sandals,46.03
+117,Sandals Product 117,Footwear,Sandals,93.7
+118,Sandals Product 118,Footwear,Sandals,78.51
+119,Sandals Product 119,Footwear,Sandals,104.21
+120,Sandals Product 120,Footwear,Sandals,94.44
+121,Sandals Product 121,Footwear,Sandals,60.86
+122,Sandals Product 122,Footwear,Sandals,38.3
+123,Sandals Product 123,Footwear,Sandals,90.02
+124,Sandals Product 124,Footwear,Sandals,131.73
+125,Sneakers Product 125,Footwear,Sneakers,129.1
+126,Sneakers Product 126,Footwear,Sneakers,189.53
+127,Sneakers Product 127,Footwear,Sneakers,114.53
+128,Sneakers Product 128,Footwear,Sneakers,98.04
+129,Sneakers Product 129,Footwear,Sneakers,71.08
+130,Sneakers Product 130,Footwear,Sneakers,110.2
