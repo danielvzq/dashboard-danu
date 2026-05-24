@@ -1,0 +1,19 @@
+/* Ocultar el menú superior (hamburguesa) de Streamlit */
+#MainMenu {
+    visibility: hidden;
+}
+
+/* Ocultar el pie de página ("Made with Streamlit") */
+footer {
+    visibility: hidden;
+}
+
+/* Ocultar el botón de "Deploy" si llega a aparecer */
+.stDeployButton {
+    display: none;
+}
+
+/* Un pequeño ajuste para que el contenido suba un poco y aproveche mejor el espacio */
+.block-container {
+    padding-top: 2rem;
+}
