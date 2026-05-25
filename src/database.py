@@ -36,3 +36,31 @@ def buscar_columna(df, posibles_nombres):
             return columnas[nombre]
 
     return None
+
+def buscar_columna(df, candidates):
+    """Buscar en un DataFrame la primera columna cuyo nombre coincida
+    exactamente o contenga alguno de los valores de `candidates`.
+
+    Devuelve el nombre original de la columna si se encuentra, o `None`.
+    """
+    if df is None:
+        return None
+
+    try:
+        cols = list(df.columns)
+    except Exception:
+        return None
+
+    # Búsqueda por coincidencia exacta (insensible a mayúsculas)
+    for cand in candidates:
+        for col in cols:
+            if col.lower() == cand.lower():
+                return col
+
+    # Búsqueda por coincidencia parcial
+    for cand in candidates:
+        for col in cols:
+            if cand.lower() in col.lower():
+                return col
+
+    return None
