@@ -242,3 +242,6 @@ else:
         df_filtrado["Date"] = pd.to_datetime(df_filtrado["Date"])
         df_tiempo = df_filtrado.groupby("Date")["Stock"].sum().sort_index()
         st.area_chart(df_tiempo, color="#f59e0b")
+
+
+        
