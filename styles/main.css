@@ -17,3 +17,102 @@ footer {
 .block-container {
     padding-top: 2rem;
 }
+
+[data-testid="stSidebarNav"] {
+    display: none;
+}
+
+section[data-testid="stSidebar"] div[data-testid="stSidebarUserContent"] {
+    padding-top: 0rem;
+}
+
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 4px 18px 4px;
+    margin-top: -35px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.16);
+}
+
+.sidebar-icon {
+    width: 58px;
+    height: 58px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #ef4444, #991b1b);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+}
+
+.sidebar-title {
+    font-size: 20px;
+    font-weight: 800;
+    color: white;
+    margin: 0;
+}
+
+.sidebar-subtitle {
+    font-size: 18px;
+    color: #a1a1aa;
+    margin: 4px 0 0 0;
+}
+.custom-card {
+    background: #ffffff;
+    padding: 28px;
+    border-radius: 18px;
+    border: 1px solid rgba(0,0,0,0.08);
+    min-height: 260px;
+}
+
+.custom-card-title {
+    color: #111827;
+    font-size: 18px;
+    font-weight: 800;
+    margin: 0 0 18px 0;
+}
+
+.custom-card-value {
+    color: #111827;
+    font-size: 44px;
+    font-weight: 900;
+    margin: 0;
+}
+
+.custom-card-description {
+    color: #6b7280;
+    font-size: 15px;
+    margin-top: 10px;
+}
+
+.custom-card-footer {
+    color: #9ca3af;
+    font-size: 13px;
+    margin-top: 18px;
+}
+
+.top5-list {
+    margin-top: 8px;
+}
+
+.top5-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 13px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+
+.top5-row span {
+    font-weight: 700;
+    color: #111827;
+    font-size: 16px;
+}
+
+.top5-row strong {
+    font-weight: 800;
+    color: #dc2626;
+    font-size: 16px;
+}

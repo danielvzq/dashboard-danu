@@ -1,48 +1,38 @@
-# src/database.py
+from pathlib import Path
+import pandas as pd
+import streamlit as st
 
-def obtener_datos_inventario():
-    """
-    Simula una consulta a una base de datos (Backend).
-    Retorna la lista de productos y su estado actual.
-    """
-    # Nota para el futuro: Aquí se inicializarán las credenciales 
-    # y se hará la consulta real a la base de datos (ej. firestore.client())
-    
-    catalogo = [
-        {"SKU": "ZAP-001", "Producto": "Tenis Deportivos Runner Pro", "Categoría": "Calzado", "Stock Actual": 250, "Estado": "Overstock"},
-        {"SKU": "RAQ-042", "Producto": "Raqueta de Tenis Máster V2", "Categoría": "Equipamiento", "Stock Actual": 80, "Estado": "Overstock"},
-        {"SKU": "SUD-089", "Producto": "Sudadera Entrenamiento", "Categoría": "Ropa Deportiva", "Stock Actual": 15, "Estado": "Stock Bajo"},
-        {"SKU": "BAL-012", "Producto": "Paquete Pelotas Tenis (x3)", "Categoría": "Equipamiento", "Stock Actual": 500, "Estado": "Saludable"},
-        {"SKU": "GOP-005", "Producto": "Gorra Ajustable", "Categoría": "Ropa Deportiva", "Stock Actual": 45, "Estado": "Saludable"},
-    ]
-    
-    return catalogo
+BASE_DIR = Path(__file__).resolve().parents[1]
+DATA_DIR = BASE_DIR / "data"
 
 
-def buscar_columna(df, candidates):
-    """Buscar en un DataFrame la primera columna cuyo nombre coincida
-    exactamente o contenga alguno de los valores de `candidates`.
+@st.cache_data
+def cargar_csv(nombre_archivo):
+    ruta = DATA_DIR / nombre_archivo
+    df = pd.read_csv(ruta)
+    df.columns = df.columns.str.strip()
+    return df
 
-    Devuelve el nombre original de la columna si se encuentra, o `None`.
-    """
-    if df is None:
-        return None
 
-    try:
-        cols = list(df.columns)
-    except Exception:
-        return None
+@st.cache_data
+def cargar_datos():
+    datos = {
+        "clientes": cargar_csv("clientes_limpio.csv"),
+        "maestra": cargar_csv("df_Maestra.csv"),
+        "inventario": cargar_csv("inventario_limpio.csv"),
+        "productos": cargar_csv("productos_limpio.csv"),
+        "ventas": cargar_csv("ventas_limpio.csv"),
+    }
 
-    # Búsqueda por coincidencia exacta (insensible a mayúsculas)
-    for cand in candidates:
-        for col in cols:
-            if col.lower() == cand.lower():
-                return col
+    return datos
 
-    # Búsqueda por coincidencia parcial
-    for cand in candidates:
-        for col in cols:
-            if cand.lower() in col.lower():
-                return col
+
+def buscar_columna(df, posibles_nombres):
+    columnas = {col.lower().strip(): col for col in df.columns}
+
+    for nombre in posibles_nombres:
+        nombre = nombre.lower().strip()
+        if nombre in columnas:
+            return columnas[nombre]
 
     return None

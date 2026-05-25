@@ -2,7 +2,6 @@
 import streamlit as st
 import streamlit_shadcn_ui as ui
 from components.alertas import tarjeta_overstock
-from src.database import obtener_datos_inventario # 1. Importamos nuestra función de datos
 
 st.set_page_config(page_title="Inventario", page_icon="📦", layout="wide")
 
