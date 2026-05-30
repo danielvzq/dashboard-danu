@@ -1,7 +1,6 @@
 # pages/4_Pronosticos.py
 # ══════════════════════════════════════════════════════════════════════
-# DANUStore — Pronósticos Inteligentes
-# Forecasting • Redistribución • Planeación Predictiva
+# DANUStore — Pronósticos de Demanda
 # ══════════════════════════════════════════════════════════════════════
 
 import warnings
@@ -12,1276 +11,695 @@ import streamlit.components.v1 as components
 
 import pandas as pd
 import numpy as np
-
 import plotly.graph_objects as go
-import plotly.express as px
-
-from prophet import Prophet
 
 from pathlib import Path
 from html import escape
-import textwrap
+
+from src.forecast_engine import (
+    load_data,
+    fit_prophet,
+    build_forecast_summary,
+    build_subcat_region_forecast,
+    build_region_forecast,
+)
+from src.redistribucion import (
+    REGION_COORDS,
+    REG_LABEL,
+    build_product_region_table,
+    build_transfer_df,
+    make_node_trace,
+    make_route_trace,
+    GEO_LAYOUT,
+)
 
 # ══════════════════════════════════════════════════════════════════════
 # CONFIG
 # ══════════════════════════════════════════════════════════════════════
-st.set_page_config(
-    page_title="Pronósticos — DANUStore",
-    page_icon="📈",
-    layout="wide",
-)
+st.set_page_config(page_title="Pronósticos — DANUStore", layout="wide")
 
 css_path = Path("styles/main.css")
-
 if css_path.exists():
     with open(css_path) as f:
-        st.markdown(
-            f"<style>{f.read()}</style>",
-            unsafe_allow_html=True
-        )
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════
-# HELPERS
+# TARJETA DE MÉTRICA
 # ══════════════════════════════════════════════════════════════════════
-def modern_metric_card(
-    title,
-    value,
-    description,
-    badge,
-    icon,
-    accent_color,
-    progress
-):
-
-    title       = escape(str(title))
-    value       = escape(str(value))
-    description = escape(str(description))
-    badge       = escape(str(badge))
-    icon        = escape(str(icon))
-
-    progress = max(0, min(progress, 100))
-
-    return f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-
-    <style>
-
-    body {{
-        margin:0;
-        font-family:Inter,system-ui,sans-serif;
-        background:transparent;
-    }}
-
-    .metric-card {{
-
-        background:
-            linear-gradient(
-                135deg,
-                rgba(15,23,42,.98),
-                rgba(30,41,59,.96)
-            );
-
-        border:1px solid rgba(148,163,184,.12);
-
-        border-radius:28px;
-
-        padding:28px;
-
-        height:210px;
-
-        box-sizing:border-box;
-
-        overflow:hidden;
-
-        position:relative;
-
-        box-shadow:
-            0 15px 40px rgba(0,0,0,.35);
-
-    }}
-
-    .metric-card::before {{
-
-        content:"";
-
-        position:absolute;
-
-        top:-50px;
-        right:-50px;
-
-        width:140px;
-        height:140px;
-
-        background:{accent_color};
-
-        opacity:.10;
-
-        border-radius:999px;
-    }}
-
-    .metric-top {{
-
-        display:flex;
-
-        justify-content:space-between;
-
-        align-items:center;
-
-        margin-bottom:18px;
-    }}
-
-    .metric-title {{
-
-        color:#cbd5e1;
-
-        font-size:15px;
-
-        font-weight:800;
-
-        margin:0;
-    }}
-
-    .metric-icon {{
-
-        width:44px;
-        height:44px;
-
-        border-radius:14px;
-
-        background:{accent_color};
-
-        display:flex;
-
-        align-items:center;
-
-        justify-content:center;
-
-        font-size:20px;
-
-        color:white;
-    }}
-
-    .metric-value {{
-
-        color:white;
-
-        font-size:34px;
-
-        font-weight:950;
-
-        letter-spacing:-1px;
-
-        margin:0;
-    }}
-
-    .metric-description {{
-
-        color:#94a3b8;
-
-        font-size:14px;
-
-        line-height:1.5;
-
-        margin-top:10px;
-    }}
-
-    .metric-footer {{
-
-        display:flex;
-
-        align-items:center;
-
-        gap:12px;
-
-        margin-top:18px;
-    }}
-
-    .metric-badge {{
-
-        background:rgba(255,255,255,.06);
-
-        padding:6px 12px;
-
-        border-radius:999px;
-
-        color:#e2e8f0;
-
-        font-size:12px;
-
-        font-weight:700;
-    }}
-
-    .metric-track {{
-
-        flex:1;
-
-        height:8px;
-
-        background:rgba(255,255,255,.08);
-
-        border-radius:999px;
-
-        overflow:hidden;
-    }}
-
-    .metric-fill {{
-
-        width:{progress:.1f}%;
-
-        height:100%;
-
-        background:{accent_color};
-
-        border-radius:999px;
-    }}
-
-    </style>
-    </head>
-
-    <body>
-
-    <div class="metric-card">
-
-        <div class="metric-top">
-
-            <p class="metric-title">{title}</p>
-
-            <div class="metric-icon">{icon}</div>
-
-        </div>
-
-        <h1 class="metric-value">{value}</h1>
-
-        <p class="metric-description">{description}</p>
-
-        <div class="metric-footer">
-
-            <span class="metric-badge">{badge}</span>
-
-            <div class="metric-track">
-                <div class="metric-fill"></div>
-            </div>
-
-        </div>
-
-    </div>
-
-    </body>
-    </html>
-    """
+def metric_card(title, value, description, badge, icon, accent, progress):
+    title=escape(str(title)); value=escape(str(value)); description=escape(str(description))
+    badge=escape(str(badge)); icon=escape(str(icon)); progress=max(0.0,min(float(progress),100.0))
+    return f"""<!DOCTYPE html><html><head><style>
+    body{{margin:0;font-family:Inter,system-ui,sans-serif;background:transparent;}}
+    .card{{background:linear-gradient(135deg,#ffffff 0%,#f8fafc 100%);
+        border:1px solid rgba(148,163,184,.22);border-radius:26px;padding:26px;height:200px;
+        box-sizing:border-box;box-shadow:0 18px 40px rgba(15,23,42,.10);position:relative;overflow:hidden;}}
+    .card::before{{content:"";position:absolute;top:-40px;right:-40px;width:130px;height:130px;
+        background:{accent};opacity:.09;border-radius:999px;}}
+    .top{{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}}
+    .ttl{{color:#0f172a;font-size:14px;font-weight:900;margin:0;line-height:1.35;max-width:78%;}}
+    .ico{{min-width:34px;height:34px;border-radius:11px;background:{accent};color:white;
+        display:flex;align-items:center;justify-content:center;font-size:16px;
+        box-shadow:0 8px 18px rgba(15,23,42,.16);font-weight:900;}}
+    .val{{color:#0f172a;font-size:22px;font-weight:950;letter-spacing:-.8px;line-height:1;
+        margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}}
+    .desc{{color:#64748b;font-size:11.5px;font-weight:600;margin:7px 0 0 0;line-height:1.45;}}
+    .foot{{display:flex;align-items:center;gap:9px;margin-top:13px;}}
+    .badge{{background:rgba(15,23,42,.06);color:#334155;font-size:11px;font-weight:800;
+        padding:4px 9px;border-radius:999px;white-space:nowrap;}}
+    .track{{flex:1;height:6px;background:#e5e7eb;border-radius:999px;overflow:hidden;}}
+    .fill{{height:100%;width:{progress:.1f}%;background:{accent};border-radius:999px;}}
+    </style></head><body>
+    <div class="card">
+      <div class="top"><p class="ttl">{title}</p><div class="ico">{icon}</div></div>
+      <h1 class="val">{value}</h1><p class="desc">{description}</p>
+      <div class="foot"><span class="badge">{badge}</span>
+        <div class="track"><div class="fill"></div></div>
+      </div>
+    </div></body></html>"""
+
+def dual_region_card(title, best_name, best_val, worst_name, worst_val, horizon):
+    title=escape(str(title)); best_name=escape(str(best_name)); best_val=escape(str(best_val))
+    worst_name=escape(str(worst_name)); worst_val=escape(str(worst_val))
+    return f"""<!DOCTYPE html><html><head><style>
+    body{{margin:0;font-family:Inter,system-ui,sans-serif;background:transparent;}}
+    .card{{background:linear-gradient(135deg,#ffffff 0%,#f8fafc 100%);
+        border:1px solid rgba(148,163,184,.22);border-radius:26px;padding:22px 26px;
+        height:200px;box-sizing:border-box;box-shadow:0 18px 40px rgba(15,23,42,.10);
+        position:relative;overflow:hidden;}}
+    .card::before{{content:"";position:absolute;top:-40px;right:-40px;width:130px;height:130px;
+        background:#7c3aed;opacity:.07;border-radius:999px;}}
+    .ttl{{color:#0f172a;font-size:14px;font-weight:900;margin:0 0 14px 0;}}
+    .row{{display:flex;align-items:center;gap:10px;margin-bottom:10px;}}
+    .dot{{width:10px;height:10px;border-radius:50%;flex-shrink:0;}}
+    .lbl{{color:#64748b;font-size:11px;font-weight:700;min-width:44px;}}
+    .nm{{color:#0f172a;font-size:13px;font-weight:800;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}}
+    .val{{color:#0f172a;font-size:13px;font-weight:900;white-space:nowrap;}}
+    .note{{color:#94a3b8;font-size:10.5px;margin-top:10px;}}
+    </style></head><body>
+    <div class="card">
+      <p class="ttl">{title}</p>
+      <div class="row"><div class="dot" style="background:#16a34a"></div>
+        <span class="lbl">Mayor</span><span class="nm">{best_name}</span><span class="val">{best_val}</span></div>
+      <div class="row"><div class="dot" style="background:#dc2626"></div>
+        <span class="lbl">Menor</span><span class="nm">{worst_name}</span><span class="val">{worst_val}</span></div>
+      <p class="note">Sin filtros · Prophet · {horizon} meses · Dataset completo</p>
+    </div></body></html>"""
 
 # ══════════════════════════════════════════════════════════════════════
-# DATA
+# COLORES Y UMBRALES
 # ══════════════════════════════════════════════════════════════════════
-@st.cache_data
-def load_data():
+def period_thresholds(h):
+    return ((1.15)**(h/12)-1)*100, ((1.25)**(h/12)-1)*100
 
-    df = pd.read_csv(
-        "data/df_Maestra.csv",
-        parse_dates=["Date"]
-    )
+def bar_color(pct, h):
+    r15, r25 = period_thresholds(h)
+    if pct >= r25: return "#16a34a"
+    if pct >= r15: return "#2563eb"
+    return "#dc2626"
 
-    df.columns = df.columns.str.strip()
+def growth_label(pct, h):
+    r15, r25 = period_thresholds(h)
+    if pct >= r25: return "Crecimiento optimo",    "#16a34a"
+    if pct >= r15: return "Crecimiento saludable", "#2563eb"
+    if pct >= 0:   return "Crecimiento moderado",  "#f59e0b"
+    return "En descenso", "#dc2626"
 
-    df["YearMonth"] = df["Date"].dt.to_period("M")
-
-    df["Excess_stock"] = (
-        df["Stock"] - df["Units_sold"]
-    ).clip(lower=0)
-
-    df["Gap_units"] = (
-        df["Stock"] - df["Units_sold"]
-    )
-
-    df["Gap_pct"] = (
-        df["Gap_units"] /
-        df["Stock"].replace(0, np.nan)
-    ) * 100
-
-    return df
-
-df_maestra = load_data()
+def annualize(pct, h):
+    return ((1+pct/100)**(12/max(h,1))-1)*100
 
 # ══════════════════════════════════════════════════════════════════════
-# FORECAST CACHE
+# LOLLIPOP CHART — mejor para valores similares que barras horizontales
+# ══════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
+# ACCURACY DEL MODELO
 # ══════════════════════════════════════════════════════════════════════
 @st.cache_data(show_spinner=False)
-def fit_prophet(
-    group_col,
-    group_val,
-    region,
-    periods
-):
-
-    df = load_data()
-
-    mask = (
-        (df["Region"] == region)
-        &
-        (df[group_col] == group_val)
-    )
-
-    sub = (
-        df[mask]
-        .groupby("YearMonth")
-        .agg(y=("Units_sold", "sum"))
-        .reset_index()
-    )
-
-    if len(sub) < 6:
-        return None, None
-
-    sub["ds"] = sub["YearMonth"].dt.to_timestamp()
-
-    sub = sub[["ds", "y"]]
-
-    model = Prophet(
-        changepoint_prior_scale=0.08,
-        seasonality_mode="additive",
-        uncertainty_samples=200,
-        yearly_seasonality=False,
-        weekly_seasonality=False,
-        daily_seasonality=False,
-    )
-
-    model.add_seasonality(
-        name="semiannual",
-        period=182.5,
-        fourier_order=4
-    )
-
-    model.fit(sub)
-
-    future = model.make_future_dataframe(
-        periods=periods,
-        freq="MS"
-    )
-
-    fc = model.predict(future)
-
-    return sub, fc
+def compute_model_accuracy() -> float:
+    df     = load_data()
+    months = sorted(df["YearMonth"].unique())
+    errors = []
+    for i in range(6, len(months)):
+        train_m = months[:i]; test_m = months[i]
+        train_data = df[df["YearMonth"].isin(train_m)]
+        test_data  = df[df["YearMonth"] == test_m]
+        last3      = train_m[-3:]
+        pred   = train_data[train_data["YearMonth"].isin(last3)].groupby("Subcategory")["Units_sold"].mean()
+        actual = test_data.groupby("Subcategory")["Units_sold"].mean()
+        common = pred.index.intersection(actual.index)
+        if len(common) > 0:
+            mape_i = (np.abs(actual[common]-pred[common])/actual[common].replace(0,np.nan)).mean()*100
+            errors.append(mape_i)
+    return round(100-float(np.mean(errors)),1) if errors else 0.0
 
 # ══════════════════════════════════════════════════════════════════════
-# REGIONES
+# DATOS
 # ══════════════════════════════════════════════════════════════════════
-REGION_COORDS = {
-
-    "bajío": {
-        "lat": 20.88,
-        "lon": -101.07,
-        "city": "León"
-    },
-
-    "ciudad de méxico": {
-        "lat": 19.43,
-        "lon": -99.13,
-        "city": "CDMX"
-    },
-
-    "zona metropolitana de monterrey": {
-        "lat": 25.67,
-        "lon": -100.31,
-        "city": "Monterrey"
-    },
-
-    "zona metropolitana de guadalajara": {
-        "lat": 20.66,
-        "lon": -103.35,
-        "city": "Guadalajara"
-    },
-
-    "noroeste": {
-        "lat": 29.09,
-        "lon": -110.96,
-        "city": "Hermosillo"
-    },
-
-    "sureste": {
-        "lat": 20.97,
-        "lon": -89.62,
-        "city": "Mérida"
-    },
-
-    "sur": {
-        "lat": 17.07,
-        "lon": -96.72,
-        "city": "Oaxaca"
-    },
-}
-
-REG_LABEL = {
-
-    "bajío": "Bajío",
-
-    "ciudad de méxico": "CDMX",
-
-    "zona metropolitana de monterrey":
-        "ZM Monterrey",
-
-    "zona metropolitana de guadalajara":
-        "ZM Guadalajara",
-
-    "noroeste": "Noroeste",
-
-    "sureste": "Sureste",
-
-    "sur": "Sur",
-}
-
-def haversine(lat1, lon1, lat2, lon2):
-
-    R = 6371
-
-    lat1, lon1, lat2, lon2 = map(
-        np.radians,
-        [lat1, lon1, lat2, lon2]
-    )
-
-    a = (
-        np.sin((lat2 - lat1) / 2) ** 2
-        +
-        np.cos(lat1)
-        * np.cos(lat2)
-        * np.sin((lon2 - lon1) / 2) ** 2
-    )
-
-    return int(
-        2 * R * np.arcsin(np.sqrt(a))
-    )
+df_maestra     = load_data()
+MODEL_ACCURACY = compute_model_accuracy()
 
 # ══════════════════════════════════════════════════════════════════════
 # SIDEBAR
 # ══════════════════════════════════════════════════════════════════════
 with st.sidebar:
-
-    sidebar_html = (
-        '<div class="sidebar-header">'
-        '<div class="sidebar-icon">📦</div>'
-        '<div>'
-        '<p class="sidebar-title">RocketData</p>'
-        '<p class="sidebar-subtitle">Inventory Dashboard</p>'
-        '</div>'
-        '</div>'
+    st.markdown(
+        '<div class="sidebar-header"><div class="sidebar-icon">📦</div>'
+        '<div><p class="sidebar-title">RocketData</p>'
+        '<p class="sidebar-subtitle">Inventory Dashboard</p></div></div>',
+        unsafe_allow_html=True,
     )
-
-    st.markdown(sidebar_html, unsafe_allow_html=True)
-
-    st.page_link("Inicio.py", label="Inicio")
-    st.page_link("pages/1_Inventario.py", label="Inventario")
-    st.page_link("pages/2_Ventas.py", label="Ventas")
-    st.page_link("pages/3_Alertas.py", label="Alertas")
+    st.page_link("Inicio.py",              label="Inicio")
+    st.page_link("pages/1_Inventario.py",  label="Inventario")
+    st.page_link("pages/2_Ventas.py",      label="Ventas")
+    st.page_link("pages/3_Alertas.py",     label="Alertas")
     st.page_link("pages/4_Pronosticos.py", label="Pronósticos")
 
     st.divider()
-
     st.markdown("### Filtros")
 
-    fecha_min = df_maestra["Date"].min().date()
-    fecha_max = df_maestra["Date"].max().date()
+    fecha_min    = df_maestra["Date"].min().date()
+    fecha_max    = df_maestra["Date"].max().date()
+    rango_fechas = st.date_input("Rango de fechas",
+        value=(fecha_min, fecha_max), min_value=fecha_min, max_value=fecha_max)
 
-    rango_fechas = st.date_input(
-        "Rango de fechas",
-        value=(fecha_min, fecha_max),
-        min_value=fecha_min,
-        max_value=fecha_max
-    )
+    regiones   = sorted(df_maestra["Region"].dropna().unique().tolist())
+    region_sel = st.selectbox("Región", ["Todas"] + regiones)
 
-    regiones = sorted(
-        df_maestra["Region"]
-        .dropna()
-        .unique()
-        .tolist()
-    )
+    categorias = sorted(df_maestra["Category"].dropna().unique().tolist())
+    cat_sel    = st.selectbox("Categoría", ["Todas"] + categorias)
 
-    region_sel = st.selectbox(
-        "Región",
-        ["Todas"] + regiones
-    )
-
-    categorias = sorted(
-        df_maestra["Category"]
-        .dropna()
-        .unique()
-        .tolist()
-    )
-
-    cat_sel = st.selectbox(
-        "Categoría",
-        ["Todas"] + categorias
-    )
-
-    # Subcategorías dependientes de la categoría seleccionada
     if cat_sel == "Todas":
-        subcategorias = sorted(
-            df_maestra["Subcategory"]
-            .dropna()
-            .unique()
-            .tolist()
-        )
+        subcategorias = sorted(df_maestra["Subcategory"].dropna().unique().tolist())
     else:
         subcategorias = sorted(
-            df_maestra.loc[
-                df_maestra["Category"] == cat_sel,
-                "Subcategory"
-            ]
-            .dropna()
-            .unique()
-            .tolist()
-        )
+            df_maestra.loc[df_maestra["Category"]==cat_sel,"Subcategory"]
+            .dropna().unique().tolist())
+    subcat_sel = st.selectbox("Subcategoría", ["Todas"] + subcategorias)
 
-    subcat_sel = st.selectbox(
-        "Subcategoría",
-        ["Todas"] + subcategorias
-    )
-
-    # Selector de producto dependiente de subcategoría (o categoría si no hay subcat)
     if subcat_sel != "Todas":
-        productos = sorted(
-            df_maestra.loc[
-                df_maestra["Subcategory"] == subcat_sel,
-                "Product_name"
-            ]
-            .dropna()
-            .unique()
-            .tolist()
-        )
+        productos = sorted(df_maestra.loc[df_maestra["Subcategory"]==subcat_sel,"Product_name"].dropna().unique().tolist())
     elif cat_sel != "Todas":
-        productos = sorted(
-            df_maestra.loc[
-                df_maestra["Category"] == cat_sel,
-                "Product_name"
-            ]
-            .dropna()
-            .unique()
-            .tolist()
-        )
+        productos = sorted(df_maestra.loc[df_maestra["Category"]==cat_sel,"Product_name"].dropna().unique().tolist())
     else:
-        productos = sorted(
-            df_maestra["Product_name"]
-            .dropna()
-            .unique()
-            .tolist()
-        )
-
-    product_sel = st.selectbox(
-        "Producto",
-        ["Todas"] + productos
-    )
+        productos = sorted(df_maestra["Product_name"].dropna().unique().tolist())
+    product_sel = st.selectbox("Producto", ["Todas"] + productos)
 
     st.divider()
-
-    horizon = st.radio(
-        "Horizonte forecast",
-        [3, 6],
-        horizontal=True,
-        format_func=lambda x: f"{x} meses"
-    )
+    horizon = st.radio("Horizonte forecast", [3, 6], horizontal=True,
+                       format_func=lambda x: f"{x} meses")
 
 # ══════════════════════════════════════════════════════════════════════
 # FILTROS
 # ══════════════════════════════════════════════════════════════════════
-df_filtrado = df_maestra.copy()
+def apply_date(df):
+    if isinstance(rango_fechas, tuple) and len(rango_fechas)==2:
+        fi, ff = rango_fechas
+        return df[(df["Date"].dt.date>=fi)&(df["Date"].dt.date<=ff)]
+    return df
 
-if isinstance(rango_fechas, tuple):
+df_filtrado = apply_date(df_maestra.copy())
+if region_sel  != "Todas": df_filtrado = df_filtrado[df_filtrado["Region"]       == region_sel]
+if cat_sel     != "Todas": df_filtrado = df_filtrado[df_filtrado["Category"]     == cat_sel]
+if subcat_sel  != "Todas": df_filtrado = df_filtrado[df_filtrado["Subcategory"]  == subcat_sel]
+if product_sel != "Todas": df_filtrado = df_filtrado[df_filtrado["Product_name"] == product_sel]
 
-    fi, ff = rango_fechas
+df_base_kpi = apply_date(df_maestra.copy())
+if region_sel != "Todas": df_base_kpi = df_base_kpi[df_base_kpi["Region"]   == region_sel]
+if cat_sel    != "Todas": df_base_kpi = df_base_kpi[df_base_kpi["Category"] == cat_sel]
 
-    df_filtrado = df_filtrado[
-        (df_filtrado["Date"].dt.date >= fi)
-        &
-        (df_filtrado["Date"].dt.date <= ff)
-    ]
+df_prod_kpi = apply_date(df_maestra.copy())
+if region_sel  != "Todas": df_prod_kpi = df_prod_kpi[df_prod_kpi["Region"]      == region_sel]
+if cat_sel     != "Todas": df_prod_kpi = df_prod_kpi[df_prod_kpi["Category"]    == cat_sel]
+if subcat_sel  != "Todas": df_prod_kpi = df_prod_kpi[df_prod_kpi["Subcategory"] == subcat_sel]
 
-if region_sel != "Todas":
-    df_filtrado = df_filtrado[
-        df_filtrado["Region"] == region_sel
-    ]
+if df_filtrado.empty:
+    st.warning("No hay datos para los filtros seleccionados.")
+    st.stop()
 
-if cat_sel != "Todas":
-    df_filtrado = df_filtrado[
-        df_filtrado["Category"] == cat_sel
-    ]
+# ── region_prophet: la región seleccionada, o la primera si "Todas" ──
+region_prophet = region_sel if region_sel != "Todas" else df_maestra["Region"].mode()[0]
 
-if subcat_sel != "Todas":
-    df_filtrado = df_filtrado[
-        df_filtrado["Subcategory"] == subcat_sel
-    ]
+# ── subcat_prophet: SOLO se usa cuando hay subcategoría seleccionada.
+#    Si subcat_sel == "Todas", la serie temporal muestra todas las subcats
+#    agregadas, sin forzar ninguna como default.
+subcat_prophet = subcat_sel if subcat_sel != "Todas" else None
 
-if 'product_sel' in globals() and product_sel != "Todas":
-    df_filtrado = df_filtrado[
-        df_filtrado["Product_name"] == product_sel
-    ]
+region_label = REG_LABEL.get(region_sel, region_sel) if region_sel != "Todas" else "Todas las regiones"
+ref15, ref25 = period_thresholds(horizon)
 
-region_prophet = (
-    region_sel
-    if region_sel != "Todas"
-    else df_maestra["Region"].mode()[0]
-)
+# ══════════════════════════════════════════════════════════════════════
+# PROPHET — FUENTE ÚNICA DE VERDAD
+# ══════════════════════════════════════════════════════════════════════
 
-subcat_prophet = (
-    subcat_sel
-    if subcat_sel != "Todas"
-    else df_maestra["Subcategory"].mode()[0]
-)
+with st.spinner("Calculando pronósticos..."):
+    forecast_df  = build_forecast_summary(df_base_kpi, region_prophet, horizon)
+    region_fc_df = build_region_forecast(horizon)
+
+if forecast_df.empty:
+    st.warning("No hay datos suficientes para generar pronósticos con los filtros actuales.")
+    st.stop()
+
+# ── KPIs ──────────────────────────────────────────────────────────────
+kpi_total_units  = (forecast_df["Forecast_avg"] * horizon).sum()
+kpi_hist_units   = (forecast_df["Hist_avg"]     * horizon).sum()
+kpi_growth_total = ((kpi_total_units-kpi_hist_units)/kpi_hist_units*100) if kpi_hist_units>0 else 0.0
+
+fc_sorted  = forecast_df.sort_values("Growth_pct", ascending=False)
+best_row   = fc_sorted.iloc[0];  best_name  = best_row["Subcategory"];  best_pct  = best_row["Growth_pct"]
+worst_row  = fc_sorted.iloc[-1]; worst_name = worst_row["Subcategory"]; worst_pct = worst_row["Growth_pct"]
+best_badge,  best_accent  = growth_label(best_pct,  horizon)
+worst_badge, worst_accent = growth_label(worst_pct, horizon)
+
+best_region  = region_fc_df.iloc[0]
+worst_region = region_fc_df.iloc[-1]
 
 # ══════════════════════════════════════════════════════════════════════
 # HEADER
 # ══════════════════════════════════════════════════════════════════════
-st.title("📈 Pronósticos Inteligentes")
-
-st.markdown(f"""
-Región:
-**{REG_LABEL.get(region_prophet, region_prophet.title())}**
-&nbsp; · &nbsp;
-Horizonte:
-**{horizon} meses**
-""")
+st.title(f"Pronósticos de Demanda — {region_label}")
+ctx_parts = []
+if cat_sel     != "Todas": ctx_parts.append(f"Categoría: **{cat_sel}**")
+if subcat_sel  != "Todas": ctx_parts.append(f"Subcategoría: **{subcat_sel}**")
+if product_sel != "Todas": ctx_parts.append(f"Producto: **{product_sel}**")
+ctx_parts.append(f"Horizonte: **{horizon} meses**")
+st.markdown(" · ".join(ctx_parts))
+st.divider()
 
 # ══════════════════════════════════════════════════════════════════════
-# KPIs FORECAST
+# KPIs
 # ══════════════════════════════════════════════════════════════════════
-forecast_rows = []
-
-with st.spinner("Calculando modelos predictivos..."):
-
-    for sc in sorted(df_filtrado["Subcategory"].dropna().unique()):
-
-        hist, fc = fit_prophet(
-            "Subcategory",
-            sc,
-            region_prophet,
-            horizon
-        )
-
-        if hist is None:
-            continue
-
-        futuro = fc[
-            fc["ds"] > hist["ds"].max()
-        ]
-
-        hist_avg = hist["y"].mean()
-        future_avg = futuro["yhat"].mean()
-
-        growth = (
-            (
-                (future_avg - hist_avg)
-                /
-                hist_avg
-            ) * 100
-            if hist_avg > 0
-            else 0
-        )
-
-        forecast_rows.append({
-
-            "Subcategory": sc,
-
-            "Hist_avg": hist_avg,
-
-            "Forecast_avg": future_avg,
-
-            "Growth_pct": growth
-        })
-
-forecast_df = pd.DataFrame(forecast_rows)
-
-future_total = forecast_df["Forecast_avg"].sum()
-
-growth_positive = (
-    forecast_df["Growth_pct"] > 0
-).sum()
-
-growth_negative = (
-    forecast_df["Growth_pct"] < -5
-).sum()
-
-top_growth = forecast_df.sort_values(
-    "Growth_pct",
-    ascending=False
-).iloc[0]
-
 c1, c2, c3, c4 = st.columns(4)
 
 with c1:
-    components.html(
-        modern_metric_card(
-            "Demanda futura",
-            f"{future_total:,.0f} u",
-            "Volumen estimado total para el horizonte seleccionado.",
-            "Forecast agregado",
-            "📦",
-            "#2563eb",
-            85
-        ),
-        height=220
-    )
+    t1_badge, t1_accent = growth_label(kpi_growth_total, horizon)
+    sign_t = "+" if kpi_growth_total >= 0 else ""
+    components.html(metric_card(
+        f"Unidades estimadas · {horizon} meses", f"{kpi_total_units:,.0f} u",
+        f"Histórico periodo: {kpi_hist_units:,.0f} u · Variación: {sign_t}{kpi_growth_total:.1f}%",
+        t1_badge, "→", t1_accent,
+        min(abs(kpi_growth_total/ref25*100) if ref25>0 else 70, 100),
+    ), height=220)
 
 with c2:
-    components.html(
-        modern_metric_card(
-            "Subcategorías en expansión",
-            f"{growth_positive}",
-            "Subcategorías con tendencia positiva esperada.",
-            "Crecimiento forecast",
-            "📈",
-            "#16a34a",
-            (growth_positive / max(len(forecast_df),1))*100
-        ),
-        height=220
-    )
+    components.html(metric_card(
+        f"Mejor subcategoria · {horizon} meses", best_name,
+        f"+{best_pct:.1f}% según Prophet · {annualize(best_pct,horizon):+.1f}% anualizado",
+        best_badge, "+", best_accent,
+        min(abs(best_pct/ref25*100) if ref25>0 else 0, 100),
+    ), height=220)
 
 with c3:
-    components.html(
-        modern_metric_card(
-            "Riesgo desaceleración",
-            f"{growth_negative}",
-            "Subcategorías con caída importante proyectada.",
-            "Forecast negativo",
-            "⚠️",
-            "#dc2626",
-            (growth_negative / max(len(forecast_df),1))*100
-        ),
-        height=220
-    )
+    sign3 = "+" if worst_pct >= 0 else ""
+    components.html(metric_card(
+        f"Menor alza · {horizon} meses", worst_name,
+        f"{sign3}{worst_pct:.1f}% según Prophet · {annualize(worst_pct,horizon):+.1f}% anualizado",
+        worst_badge, "!", worst_accent,
+        min(abs(worst_pct/ref25*100) if ref25>0 else 0, 100),
+    ), height=220)
 
 with c4:
-    components.html(
-        modern_metric_card(
-            "Mayor aceleración",
-            f"{top_growth['Growth_pct']:+.1f}%",
-            f"{top_growth['Subcategory']} lidera el crecimiento.",
-            "Top performer",
-            "🚀",
-            "#7c3aed",
-            min(abs(top_growth["Growth_pct"]),100)
-        ),
-        height=220
-    )
+    components.html(dual_region_card(
+        f"Regiones · {horizon} meses (sin filtros)",
+        best_region["Region_label"],  f"{best_region['Forecast_total']:,.0f} u",
+        worst_region["Region_label"], f"{worst_region['Forecast_total']:,.0f} u",
+        horizon,
+    ), height=220)
+
+st.divider()
 
 # ══════════════════════════════════════════════════════════════════════
 # TABS
 # ══════════════════════════════════════════════════════════════════════
-tab_pred, tab_redist = st.tabs([
-    "📊 Predicción de demanda",
-    "🗺️ Redistribución inteligente"
-])
+tab_pred, tab_redist = st.tabs(["Predicción de demanda", "Redistribución de inventario"])
 
 # ══════════════════════════════════════════════════════════════════════
-# TAB PREDICCION
+# TAB 1 — PREDICCIÓN DE DEMANDA
 # ══════════════════════════════════════════════════════════════════════
 with tab_pred:
 
-    hist_df, fc_df = fit_prophet(
-        "Subcategory",
-        subcat_prophet,
-        region_prophet,
-        horizon
-    )
+    # ── Serie temporal ────────────────────────────────────────────────
+    # Si hay subcategoría o producto seleccionado → Prophet específico
+    # Si no hay filtro → Prophet sobre el total de la región (todas las subcats)
+    if product_sel != "Todas":
+        @st.cache_data(show_spinner=False)
+        def fit_prophet_product(product_name, region, periods):
+            df   = load_data()
+            mask = (df["Product_name"]==product_name) & (df["Region"]==region)
+            sub  = df[mask].groupby("YearMonth").agg(y=("Units_sold","sum")).reset_index()
+            if len(sub) < 6: return None, None
+            sub["ds"] = sub["YearMonth"].dt.to_timestamp()
+            sub = sub[["ds","y"]]
+            from prophet import Prophet as _P
+            m = _P(changepoint_prior_scale=0.05, seasonality_mode="additive",
+                   uncertainty_samples=300, yearly_seasonality=False,
+                   weekly_seasonality=False, daily_seasonality=False)
+            m.add_seasonality(name="semestral", period=182.5, fourier_order=3)
+            m.fit(sub); future = m.make_future_dataframe(periods=periods, freq="MS")
+            return sub, m.predict(future)
+
+        hist_df, fc_df = fit_prophet_product(product_sel, region_prophet, horizon)
+        chart_title    = f"Demanda proyectada — {product_sel}"
+
+    elif subcat_prophet is not None:
+        # Subcategoría seleccionada explícitamente
+        hist_df, fc_df = fit_prophet("Subcategory", subcat_prophet, region_prophet, horizon)
+        chart_title    = f"Demanda proyectada — {subcat_prophet}"
+
+    else:
+        # Sin filtro: Prophet sobre el TOTAL de la región (todas las subcats agregadas)
+        @st.cache_data(show_spinner=False)
+        def fit_prophet_region_total(region, periods):
+            df  = load_data()
+            sub = (df[df["Region"]==region]
+                   .groupby("YearMonth").agg(y=("Units_sold","sum")).reset_index())
+            if len(sub) < 6: return None, None
+            sub["ds"] = sub["YearMonth"].dt.to_timestamp()
+            sub = sub[["ds","y"]]
+            from prophet import Prophet as _P
+            m = _P(changepoint_prior_scale=0.05, seasonality_mode="additive",
+                   uncertainty_samples=300, yearly_seasonality=False,
+                   weekly_seasonality=False, daily_seasonality=False)
+            m.add_seasonality(name="semestral", period=182.5, fourier_order=3)
+            m.fit(sub); future = m.make_future_dataframe(periods=periods, freq="MS")
+            return sub, m.predict(future)
+
+        hist_df, fc_df = fit_prophet_region_total(region_prophet, horizon)
+        chart_title    = f"Demanda proyectada — {region_label} (todas las categorías)"
 
     if hist_df is not None:
-
-        future_mask = (
-            fc_df["ds"] > hist_df["ds"].max()
-        )
-
-        future_fc = fc_df[future_mask]
-
+        future_fc = fc_df[fc_df["ds"] > hist_df["ds"].max()]
         fig = go.Figure()
-
         fig.add_trace(go.Scatter(
-
-            x=pd.concat([
-                future_fc["ds"],
-                future_fc["ds"][::-1]
-            ]),
-
-            y=pd.concat([
-                future_fc["yhat_upper"],
-                future_fc["yhat_lower"][::-1]
-            ]),
-
-            fill="toself",
-
-            fillcolor="rgba(59,130,246,.12)",
-
-            line=dict(color="rgba(0,0,0,0)"),
-
-            hoverinfo="skip",
-
-            name="Intervalo confianza"
+            x=pd.concat([future_fc["ds"], future_fc["ds"][::-1]]),
+            y=pd.concat([future_fc["yhat_upper"], future_fc["yhat_lower"][::-1]]),
+            fill="toself", fillcolor="rgba(37,99,235,.08)",
+            line=dict(color="rgba(0,0,0,0)"), hoverinfo="skip", name="Intervalo de confianza",
         ))
-
         fig.add_trace(go.Scatter(
-
-            x=hist_df["ds"],
-
-            y=hist_df["y"],
-
-            mode="lines+markers",
-
-            name="Histórico",
-
-            line=dict(
-                color="#60a5fa",
-                width=4
-            ),
-
-            marker=dict(size=7),
-
-            hovertemplate=
-                "<b>%{x|%b %Y}</b><br>"
-                "Ventas: %{y:,.0f} u"
-                "<extra></extra>"
+            x=hist_df["ds"], y=hist_df["y"], mode="lines+markers", name="Histórico",
+            line=dict(color="#2563eb", width=3), marker=dict(size=6, color="#2563eb"),
+            hovertemplate="<b>%{x|%b %Y}</b><br>Ventas: %{y:,.0f} u<extra></extra>",
         ))
-
         fig.add_trace(go.Scatter(
-
-            x=future_fc["ds"],
-
-            y=future_fc["yhat"],
-
-            mode="lines+markers",
-
-            name="Forecast",
-
-            line=dict(
-                color="#22c55e",
-                width=5
-            ),
-
-            marker=dict(
-                size=10,
-                symbol="diamond"
-            ),
-
-            hovertemplate=
-                "<b>%{x|%b %Y}</b><br>"
-                "Forecast: %{y:,.0f} u"
-                "<extra></extra>"
+            x=future_fc["ds"], y=future_fc["yhat"],
+            mode="lines+markers", name=f"Forecast Prophet ({horizon} meses)",
+            line=dict(color="#16a34a", width=3, dash="dot"),
+            marker=dict(size=9, symbol="diamond", color="#16a34a"),
+            hovertemplate="<b>%{x|%b %Y}</b><br>Forecast: %{y:,.0f} u<extra></extra>",
         ))
-
         fig.update_layout(
-
-            title=
-                f"Demanda esperada — "
-                f"{subcat_prophet}",
-
-            height=600,
-
-            hovermode="x unified",
-
-            plot_bgcolor="rgba(0,0,0,0)",
-
-            paper_bgcolor="rgba(0,0,0,0)",
-
-            font=dict(color="#e2e8f0"),
-
-            margin=dict(
-                l=40,
-                r=40,
-                t=70,
-                b=40
-            ),
-
-            xaxis=dict(
-                title="Tiempo",
-                showgrid=True,
-                gridcolor="rgba(148,163,184,.10)"
-            ),
-
-            yaxis=dict(
-                title="Unidades",
-                showgrid=True,
-                gridcolor="rgba(148,163,184,.10)"
-            ),
-
-            legend=dict(
-                orientation="h",
-                y=1.06
-            )
+            title=dict(text=chart_title, font=dict(size=18, color="#0f172a")),
+            height=460, hovermode="x unified",
+            plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+            font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
+            margin=dict(l=40, r=40, t=70, b=40),
+            xaxis=dict(title="Período", showgrid=True,
+                       gridcolor="rgba(148,163,184,.20)", linecolor="rgba(148,163,184,.30)"),
+            yaxis=dict(title="Unidades", showgrid=True,
+                       gridcolor="rgba(148,163,184,.20)", linecolor="rgba(148,163,184,.30)"),
+            legend=dict(orientation="h", y=1.08, x=0),
         )
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption("La banda azul muestra el intervalo de confianza. La línea punteada verde es la demanda proyectada por Prophet.")
+    else:
+        nivel = "producto" if product_sel != "Todas" else "subcategoría/región"
+        st.info(f"No hay suficientes datos históricos para este {nivel} (mínimo 6 meses).")
 
-        st.plotly_chart(
-            fig,
-            use_container_width=True
+    st.divider()
+
+    # ── Gráfica barras Prophet + Accuracy ─────────────────────────────
+    col_bar, col_acc = st.columns([3, 1], gap="large")
+
+    with col_bar:
+        st.markdown(f"### Crecimiento por subcategoria · {region_label}")
+        st.caption("Crecimiento calculado por Prophet: demanda proyectada vs promedio histórico.")
+        fc_bar = forecast_df.sort_values("Growth_pct", ascending=False)
+        colors_bar = [bar_color(v, horizon) for v in fc_bar["Growth_pct"]]
+        fig_bar = go.Figure()
+        fig_bar.add_trace(go.Bar(
+            x=fc_bar["Growth_pct"], y=fc_bar["Subcategory"],
+            orientation="h",
+            text=[f"{v:+.1f}%" for v in fc_bar["Growth_pct"]],
+            textposition="outside",
+            marker=dict(color=colors_bar, opacity=0.88),
+            customdata=np.stack([fc_bar["Forecast_avg"]*horizon, fc_bar["Hist_avg"]*horizon], axis=-1),
+            hovertemplate=(
+                "<b>%{y}</b><br>Crecimiento Prophet: %{x:+.1f}%<br>"
+                "Forecast total: %{customdata[0]:,.0f} u<br>"
+                "Histórico total: %{customdata[1]:,.0f} u<extra></extra>"
+            ),
+        ))
+        fig_bar.add_vline(x=ref15, line=dict(color="#f59e0b", width=1.5, dash="dot"),
+            annotation_text=f"15% anual ({ref15:.1f}% en {horizon}m)",
+            annotation_position="top", annotation_font=dict(color="#b45309", size=10))
+        fig_bar.add_vline(x=ref25, line=dict(color="#16a34a", width=1.5, dash="dot"),
+            annotation_text=f"25% anual ({ref25:.1f}% en {horizon}m)",
+            annotation_position="top", annotation_font=dict(color="#15803d", size=10))
+        fig_bar.update_layout(
+            height=440, plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+            font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
+            margin=dict(l=10, r=100, t=20, b=40),
+            yaxis=dict(autorange="reversed", tickfont=dict(size=13)),
+            xaxis=dict(title=f"Crecimiento Prophet en {horizon} meses (%)",
+                       showgrid=True, gridcolor="rgba(148,163,184,.20)",
+                       zeroline=True, zerolinecolor="rgba(148,163,184,.40)", zerolinewidth=1.5),
         )
-
+        st.plotly_chart(fig_bar, use_container_width=True)
         st.caption(
-            "La banda azul representa el intervalo "
-            "de confianza del modelo predictivo."
+            f"Verde: >= {ref25:.1f}% en {horizon}m (óptimo >25% anual)  ·  "
+            f"Azul: >= {ref15:.1f}% (saludable 15-25% anual)  ·  "
+            f"Rojo: < {ref15:.1f}% (por debajo del 15% anual)"
         )
 
-    st.markdown("## 📈 Crecimiento esperado")
-
-    top_growth_df = forecast_df.sort_values(
-        "Growth_pct",
-        ascending=False
-    ).head(12)
-
-    fig_bar = go.Figure()
-
-    fig_bar.add_trace(go.Bar(
-
-        x=top_growth_df["Growth_pct"],
-
-        y=top_growth_df["Subcategory"],
-
-        orientation="h",
-
-        text=[
-            f"{v:+.1f}%"
-            for v in top_growth_df["Growth_pct"]
-        ],
-
-        textposition="outside",
-
-        marker=dict(
-            color=top_growth_df["Growth_pct"],
-            colorscale="Viridis"
+    with col_acc:
+        st.markdown("### Confianza del modelo")
+        st.markdown("<br>", unsafe_allow_html=True)
+        acc_color = "#16a34a" if MODEL_ACCURACY>=85 else "#f59e0b" if MODEL_ACCURACY>=75 else "#dc2626"
+        fig_gauge = go.Figure(go.Indicator(
+            mode="gauge+number", value=MODEL_ACCURACY,
+            number=dict(suffix="%", font=dict(size=34, color="#0f172a", family="Inter, system-ui, sans-serif")),
+            gauge=dict(
+                axis=dict(range=[0,100], tickwidth=1, tickcolor="#cbd5e1",
+                          tickfont=dict(size=10, color="#64748b")),
+                bar=dict(color=acc_color, thickness=0.55),
+                bgcolor="#f8fafc", borderwidth=0,
+                steps=[dict(range=[0,75],color="#fee2e2"),
+                       dict(range=[75,85],color="#fef3c7"),
+                       dict(range=[85,100],color="#dcfce7")],
+                threshold=dict(line=dict(color="#0f172a",width=2), thickness=0.75, value=MODEL_ACCURACY),
+            ),
+            title=dict(
+                text=("Accuracy general<br>"
+                      "<span style='font-size:11px;color:#64748b'>Walk-forward · datos históricos</span>"),
+                font=dict(size=13, color="#0f172a", family="Inter, system-ui, sans-serif"),
+            ),
+        ))
+        fig_gauge.update_layout(height=300, paper_bgcolor="#ffffff",
+            margin=dict(l=20,r=20,t=60,b=10), font=dict(family="Inter, system-ui, sans-serif"))
+        st.plotly_chart(fig_gauge, use_container_width=True)
+        st.markdown(
+            f"""<div style="background:#f8fafc;border:1px solid rgba(148,163,184,.22);
+                border-radius:16px;padding:14px;margin-top:4px;">
+                <p style="margin:0;font-size:12px;font-weight:700;color:#0f172a;">Metodología</p>
+                <p style="margin:6px 0 0 0;font-size:11px;color:#64748b;line-height:1.55;">
+                Walk-forward mensual. Predice cada mes usando solo datos anteriores.
+                MAPE: <b>{100-MODEL_ACCURACY:.1f}%</b><br><br>
+                Valor fijo para todo el modelo.
+                </p></div>""",
+            unsafe_allow_html=True,
         )
-    ))
 
-    fig_bar.update_layout(
+    st.divider()
 
-        height=560,
+    # ── Estacionalidad / Comparación por región — con toggle ──────────
+    st.markdown("### Análisis estacional")
 
-        title=
-            "Subcategorías con mayor "
-            "crecimiento proyectado",
-
-        plot_bgcolor="rgba(0,0,0,0)",
-
-        paper_bgcolor="rgba(0,0,0,0)",
-
-        font=dict(color="#e2e8f0"),
-
-        yaxis=dict(
-            autorange="reversed"
-        ),
-
-        xaxis=dict(
-            title="% crecimiento esperado",
-            showgrid=True,
-            gridcolor="rgba(148,163,184,.12)"
-        )
+    # Toggle para cambiar entre estacionalidad mensual y comparación de regiones
+    vista_opcion = st.radio(
+        "",
+        ["Estacionalidad mensual de ventas", "Comparación de regiones por forecast"],
+        horizontal=True,
+        label_visibility="collapsed",
     )
 
-    st.plotly_chart(
-        fig_bar,
-        use_container_width=True
-    )
+    if vista_opcion == "Estacionalidad mensual de ventas":
+        st.caption("Promedio histórico de ventas por mes del año. Útil para anticipar picos y planear reabastecimiento.")
+
+        df_seas = df_base_kpi.copy()
+        df_seas["Month"] = df_seas["Date"].dt.month
+        month_names = {1:"Ene",2:"Feb",3:"Mar",4:"Abr",5:"May",6:"Jun",
+                       7:"Jul",8:"Ago",9:"Sep",10:"Oct",11:"Nov",12:"Dic"}
+        seasonality = df_seas.groupby("Month")["Units_sold"].mean().reset_index()
+        seasonality["Month_name"] = seasonality["Month"].map(month_names)
+        seasonality = seasonality.sort_values("Month")
+        global_avg  = seasonality["Units_sold"].mean()
+        seas_colors = ["#16a34a" if v>=global_avg*1.05 else "#dc2626" if v<=global_avg*0.95 else "#2563eb"
+                       for v in seasonality["Units_sold"]]
+
+        fig_seas = go.Figure()
+        fig_seas.add_hline(y=global_avg, line=dict(color="#94a3b8", width=1.5, dash="dot"),
+            annotation_text="Promedio", annotation_position="right",
+            annotation_font=dict(color="#64748b", size=11))
+        fig_seas.add_trace(go.Bar(
+            x=seasonality["Month_name"], y=seasonality["Units_sold"],
+            marker=dict(color=seas_colors, opacity=0.88),
+            text=[f"{v:,.0f}" for v in seasonality["Units_sold"]],
+            textposition="outside",
+            hovertemplate="<b>%{x}</b><br>Promedio histórico: %{y:,.0f} u<extra></extra>",
+        ))
+        fig_seas.update_layout(
+            height=380, plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+            font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
+            margin=dict(l=10, r=40, t=20, b=40),
+            xaxis=dict(title="Mes", showgrid=False),
+            yaxis=dict(title="Ventas promedio (u)", showgrid=True, gridcolor="rgba(148,163,184,.20)"),
+        )
+        st.plotly_chart(fig_seas, use_container_width=True)
+        st.caption(
+            "Verde: >5% sobre el promedio  ·  Rojo: >5% bajo el promedio  ·  "
+            "Azul: dentro del rango  ·  Datos históricos reales, no Prophet."
+        )
+
+    else:
+        # Comparación de regiones: forecast total por región para 3 y 6 meses
+        st.caption(f"Demanda total proyectada por Prophet para cada región. Sin filtros, dataset completo.")
+
+        with st.spinner("Cargando comparación de regiones..."):
+            fc3 = build_region_forecast(3)
+            fc6 = build_region_forecast(6)
+
+        fc3 = fc3.rename(columns={"Forecast_total":"fc3", "Growth_pct":"gp3"})
+        fc6 = fc6.rename(columns={"Forecast_total":"fc6", "Growth_pct":"gp6"})
+        region_compare = fc3[["Region_label","Hist_avg","fc3","gp3"]].merge(
+            fc6[["Region_label","fc6","gp6"]], on="Region_label"
+        ).sort_values("fc6", ascending=True)
+
+        fig_comp = go.Figure()
+        fig_comp.add_trace(go.Bar(
+            name="Forecast 3 meses",
+            y=region_compare["Region_label"],
+            x=region_compare["fc3"],
+            orientation="h",
+            marker=dict(color="#2563eb", opacity=0.80),
+            hovertemplate="<b>%{y}</b><br>3 meses: %{x:,.0f} u<extra></extra>",
+        ))
+        fig_comp.add_trace(go.Bar(
+            name="Forecast 6 meses",
+            y=region_compare["Region_label"],
+            x=region_compare["fc6"],
+            orientation="h",
+            marker=dict(color="#16a34a", opacity=0.80),
+            hovertemplate="<b>%{y}</b><br>6 meses: %{x:,.0f} u<extra></extra>",
+        ))
+        fig_comp.update_layout(
+            barmode="group",
+            height=420, plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+            font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
+            margin=dict(l=10, r=40, t=20, b=40),
+            legend=dict(orientation="h", y=1.06, x=0),
+            yaxis=dict(tickfont=dict(size=12)),
+            xaxis=dict(title="Unidades proyectadas", showgrid=True,
+                       gridcolor="rgba(148,163,184,.20)"),
+        )
+        st.plotly_chart(fig_comp, use_container_width=True)
+
+        # Tabla resumen
+        tabla = region_compare.copy()
+        tabla.columns = ["Región","Promedio hist. mensual","Forecast 3m","Crec. 3m (%)","Forecast 6m","Crec. 6m (%)"]
+        tabla["Promedio hist. mensual"] = tabla["Promedio hist. mensual"].map("{:,.0f}".format)
+        tabla["Forecast 3m"]            = tabla["Forecast 3m"].map("{:,.0f}".format)
+        tabla["Forecast 6m"]            = tabla["Forecast 6m"].map("{:,.0f}".format)
+        tabla["Crec. 3m (%)"]           = tabla["Crec. 3m (%)"].map("{:+.1f}%".format)
+        tabla["Crec. 6m (%)"]           = tabla["Crec. 6m (%)"].map("{:+.1f}%".format)
+        st.dataframe(tabla.sort_values("Forecast 6m", ascending=False), use_container_width=True, hide_index=True)
 
 # ══════════════════════════════════════════════════════════════════════
-# TAB REDISTRIBUCION
+# TAB 2 — REDISTRIBUCIÓN DE INVENTARIO
 # ══════════════════════════════════════════════════════════════════════
 with tab_redist:
 
+    st.markdown("### Plan de redistribución de inventario")
     st.markdown(
-        "## 🗺️ Redistribución inteligente"
+        "El sistema detecta regiones con exceso de stock respecto a la demanda "
+        f"proyectada a {horizon} meses (Prophet) y sugiere transferencias hacia "
+        "las regiones con mayor demanda esperada."
     )
 
-    transfer_rows = []
+    with st.spinner("Calculando pronósticos por región..."):
+        subcat_region_forecast = build_subcat_region_forecast(df_maestra, horizon)
 
-    subcats_all = (
-        df_maestra["Subcategory"]
-        .dropna()
-        .unique()
-    )
+    prod_region = build_product_region_table(df_maestra, subcat_region_forecast)
+    transfer_df = build_transfer_df(prod_region, horizon)
 
-    for sc in subcats_all:
-
-        sub_df = df_maestra[
-            df_maestra["Subcategory"] == sc
-        ].copy()
-
-        resumen = (
-            sub_df.groupby(["Region", "Category"])
-            .agg(
-                Excess_stock=("Excess_stock", "mean"),
-                Units_sold=("Units_sold", "mean"),
-                Stock=("Stock", "mean"),
-                Sell_through=("Sell_through_pct", "mean")
-            )
-            .reset_index()
-        )
-
-        resumen["Origen_score"] = (
-            resumen["Excess_stock"] *
-            (100 - resumen["Sell_through"])
-        )
-
-        resumen["Destino_score"] = (
-            resumen["Units_sold"] *
-            resumen["Sell_through"]
-        )
-
-        origenes = resumen.sort_values(
-            "Origen_score",
-            ascending=False
-        ).head(3)
-
-        destinos = resumen.sort_values(
-            "Destino_score",
-            ascending=False
-        ).head(3)
-
-        for _, o in origenes.iterrows():
-
-            for _, d in destinos.iterrows():
-
-                if o["Region"] == d["Region"]:
-                    continue
-
-                exceso = o["Excess_stock"]
-
-                demanda = d["Units_sold"]
-
-                unidades = int(
-                    max(
-                        min(
-                            exceso * 0.75,
-                            demanda * 0.55
-                        ),
-                        0
-                    )
-                )
-
-                if unidades <= 0:
-                    continue
-
-                dist = haversine(
-                    REGION_COORDS[o["Region"]]["lat"],
-                    REGION_COORDS[o["Region"]]["lon"],
-                    REGION_COORDS[d["Region"]]["lat"],
-                    REGION_COORDS[d["Region"]]["lon"]
-                )
-
-                transfer_rows.append({
-
-                    "Origen": o["Region"],
-
-                    "Destino": d["Region"],
-
-                    "Subcategory": sc,
-
-                    "Category": o["Category"],
-
-                    "Unidades": unidades,
-
-                    "Distancia": dist,
-
-                    "Exceso_origen": round(exceso, 0),
-
-                    "Demanda_destino": round(demanda, 0),
-
-                    "Sell_through_destino":
-                        round(d["Sell_through"], 1)
-                })
-
-    transfer_df = (
-        pd.DataFrame(transfer_rows)
-        .sort_values(
-            "Unidades",
-            ascending=False
-        )
-        .drop_duplicates(
-            subset=[
-                "Origen",
-                "Destino",
-                "Subcategory"
-            ]
-        )
-    )
-
-    # ══════════════════════════════════════════════════════════════
-    # MAPA
-    # ══════════════════════════════════════════════════════════════
-    fig_map = go.Figure()
-
-    for _, row in transfer_df.iterrows():
-
-        o = REGION_COORDS[row["Origen"]]
-        d = REGION_COORDS[row["Destino"]]
-
-        fig_map.add_trace(go.Scattergeo(
-
-            lat=[o["lat"], d["lat"]],
-
-            lon=[o["lon"], d["lon"]],
-
-            mode="lines",
-
-            line=dict(
-                width=2.5,
-                color="rgba(99,102,241,.42)"
-            ),
-
-            hovertemplate=
-                f"<b>{REG_LABEL.get(row['Origen'])}"
-                f" → "
-                f"{REG_LABEL.get(row['Destino'])}</b><br><br>"
-
-                f"Categoría: "
-                f"<b>{row['Category']}</b><br>"
-
-                f"Subcategoría: "
-                f"<b>{row['Subcategory']}</b><br>"
-
-                f"Cantidad: "
-                f"<b>{row['Unidades']:,} u</b><br>"
-
-                f"Distancia: "
-                f"<b>{row['Distancia']:,} km</b><br>"
-
-                f"Exceso origen: "
-                f"<b>{row['Exceso_origen']:,} u</b><br>"
-
-                f"Demanda destino: "
-                f"<b>{row['Demanda_destino']:,} u</b>"
-
-                "<extra></extra>",
-
-            showlegend=False
+    frames, slider_steps = [], []
+    for i, row in transfer_df.iterrows():
+        frames.append(go.Frame(
+            data=[make_route_trace(row, horizon),
+                  make_node_trace(highlight_origen=row["Origen"], highlight_destino=row["Destino"])],
+            name=str(i),
+        ))
+        slider_steps.append(dict(
+            args=[[str(i)], dict(frame=dict(duration=700, redraw=True), mode="immediate")],
+            label=f"{REG_LABEL.get(row['Origen'],'?')} → {REG_LABEL.get(row['Destino'],'?')}",
+            method="animate",
         ))
 
-    for region, data in REGION_COORDS.items():
-
-        fig_map.add_trace(go.Scattergeo(
-
-            lat=[data["lat"]],
-
-            lon=[data["lon"]],
-
-            mode="markers+text",
-
-            marker=dict(
-                size=18,
-                color="#2563eb",
-                line=dict(
-                    width=2,
-                    color="white"
-                )
+    first_row = transfer_df.iloc[0]
+    fig_map   = go.Figure(
+        data=[make_route_trace(first_row, horizon),
+              make_node_trace(highlight_origen=first_row["Origen"], highlight_destino=first_row["Destino"])],
+        frames=frames,
+        layout=go.Layout(
+            height=640,
+            paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
+            font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
+            margin=dict(l=0, r=0, t=60, b=0), geo=GEO_LAYOUT,
+            title=dict(
+                text=(f"Flujo de redistribución — Prophet {horizon} meses   "
+                      "Rojo: envía  ·  Verde: recibe  ·  Azul: sin movimiento"),
+                font=dict(size=14, color="#0f172a"),
             ),
-
-            text=[data["city"]],
-
-            textposition="top center",
-
-            hovertemplate=
-                f"<b>{REG_LABEL.get(region)}</b>"
-                "<extra></extra>",
-
-            showlegend=False
-        ))
-
-    fig_map.update_layout(
-
-        height=680,
-
-        paper_bgcolor="rgba(0,0,0,0)",
-
-        plot_bgcolor="rgba(0,0,0,0)",
-
-        font=dict(color="#e2e8f0"),
-
-        margin=dict(
-            l=0,
-            r=0,
-            t=60,
-            b=0
+            updatemenus=[dict(
+                type="buttons", showactive=False,
+                x=0.5, xanchor="center", y=-0.04, yanchor="top",
+                bgcolor="#f1f5f9", bordercolor="rgba(148,163,184,.4)",
+                font=dict(color="#0f172a"),
+                buttons=[
+                    dict(label="Play", method="animate",
+                         args=[None, dict(frame=dict(duration=1400, redraw=True),
+                                          fromcurrent=True, transition=dict(duration=200))]),
+                    dict(label="Pausa", method="animate",
+                         args=[[None], dict(frame=dict(duration=0, redraw=False), mode="immediate")]),
+                ],
+            )],
+            sliders=[dict(
+                active=0,
+                currentvalue=dict(prefix="Transferencia: ", font=dict(color="#64748b", size=13)),
+                pad=dict(t=50, b=10),
+                bgcolor="#f8fafc", bordercolor="rgba(148,163,184,.3)",
+                font=dict(color="#334155", size=11),
+                steps=slider_steps,
+            )],
         ),
-
-        geo=dict(
-
-            scope="north america",
-
-            projection_scale=4.8,
-
-            center=dict(
-                lat=23.6,
-                lon=-102.5
-            ),
-
-            showland=True,
-
-            landcolor="#0f172a",
-
-            showocean=True,
-
-            oceancolor="#020617",
-
-            showlakes=True,
-
-            lakecolor="#020617",
-
-            showcountries=True,
-
-            countrycolor="rgba(255,255,255,.12)",
-
-            subunitcolor="rgba(255,255,255,.08)",
-
-            coastlinecolor="rgba(255,255,255,.08)",
-
-            bgcolor="rgba(0,0,0,0)"
-        )
     )
-
-    st.plotly_chart(
-        fig_map,
-        use_container_width=True
-    )
-
+    st.plotly_chart(fig_map, use_container_width=True)
     st.caption(
-        "Las conexiones representan transferencias "
-        "óptimas sugeridas según demanda, "
-        "sell-through y exceso de inventario."
+        f"Presiona Play para recorrer las transferencias sugeridas (Prophet {horizon} meses). "
+        "Pasa el cursor sobre cada ruta para ver el detalle del producto."
     )
 
-    # ══════════════════════════════════════════════════════════════
-    # TABLA
-    # ══════════════════════════════════════════════════════════════
-    st.markdown(
-        "## 📦 Plan sugerido de transferencias"
-    )
-
-    transfer_show = transfer_df.copy()
-
-    transfer_show["Origen"] = (
-        transfer_show["Origen"]
-        .map(REG_LABEL)
-    )
-
-    transfer_show["Destino"] = (
-        transfer_show["Destino"]
-        .map(REG_LABEL)
-    )
-
+    st.markdown("### Plan detallado de transferencias")
+    transfer_show = transfer_df[[
+        "Producto","Categoría","Subcategoría","Origen","Destino",
+        "Unidades_sugeridas","Exceso_origen","Forecast_destino",
+        "Sell_through_origen","Sell_through_destino","Distancia_km",
+    ]].copy()
+    transfer_show["Origen"]  = transfer_show["Origen"].map(REG_LABEL)
+    transfer_show["Destino"] = transfer_show["Destino"].map(REG_LABEL)
     transfer_show.columns = [
-
-        "Origen",
-
-        "Destino",
-
-        "Subcategoría",
-
-        "Categoría",
-
-        "Cantidad sugerida",
-
-        "Distancia (km)",
-
-        "Exceso origen",
-
-        "Demanda destino",
-
-        "Sell-through destino"
+        "Producto","Categoría","Subcategoría","Origen","Destino",
+        "Unidades sugeridas","Exceso origen (u)",
+        f"Forecast destino ({horizon} meses)",
+        "Sell-through origen (%)","Sell-through destino (%)","Distancia (km)",
     ]
-
-    st.dataframe(
-        transfer_show,
-        use_container_width=True,
-        hide_index=True
-    )
+    st.dataframe(transfer_show, use_container_width=True, hide_index=True)
