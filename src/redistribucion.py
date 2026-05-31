@@ -1,53 +1,27 @@
-# utils/redistribucion.py
+# src/redistribucion.py
 # ══════════════════════════════════════════════════════════════════════
 # DANUStore — Lógica de Redistribución de Inventario
-# Surplus · Transferencias · Trazas del mapa animado
-# ══════════════════════════════════════════════════════════════════════
-#
-# Separado de la UI para que 4_Pronosticos.py solo llame funciones
-# y se enfoque en renderizar.
-#
-# Importar así:
-#   from utils.redistribucion import (
-#       REGION_COORDS, REG_LABEL, haversine,
-#       build_product_region_table,
-#       build_transfer_df,
-#       make_node_trace,
-#       make_route_trace,
-#   )
+# Oleadas bisemanales proporcionales al forecast Prophet
+# Nivel de producto: se manda el producto más débil de cada subcat+región
+# Fechas: los 3 meses reales del forecast (no desde hoy)
 # ══════════════════════════════════════════════════════════════════════
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import streamlit as st
+from datetime import date
+from dateutil.relativedelta import relativedelta
 
-
-# ══════════════════════════════════════════════════════════════════════
 # CONSTANTES GEOGRÁFICAS
-# ══════════════════════════════════════════════════════════════════════
-
 REGION_COORDS: dict[str, dict] = {
-    "bajío": {
-        "lat": 20.88, "lon": -101.07, "city": "León"
-    },
-    "ciudad de méxico": {
-        "lat": 19.43, "lon": -99.13, "city": "CDMX"
-    },
-    "zona metropolitana de monterrey": {
-        "lat": 25.67, "lon": -100.31, "city": "Monterrey"
-    },
-    "zona metropolitana de guadalajara": {
-        "lat": 20.66, "lon": -103.35, "city": "Guadalajara"
-    },
-    "noroeste": {
-        "lat": 29.09, "lon": -110.96, "city": "Hermosillo"
-    },
-    "sureste": {
-        "lat": 20.97, "lon": -89.62, "city": "Mérida"
-    },
-    "sur": {
-        "lat": 17.07, "lon": -96.72, "city": "Oaxaca"
-    },
+    "bajío":                               {"lat": 20.88, "lon": -101.07, "city": "León"},
+    "ciudad de méxico":                    {"lat": 19.43, "lon": -99.13,  "city": "CDMX"},
+    "zona metropolitana de monterrey":     {"lat": 25.67, "lon": -100.31, "city": "Monterrey"},
+    "zona metropolitana de guadalajara":   {"lat": 20.66, "lon": -103.35, "city": "Guadalajara"},
+    "noroeste":                            {"lat": 29.09, "lon": -110.96, "city": "Hermosillo"},
+    "sureste":                             {"lat": 20.97, "lon": -89.62,  "city": "Mérida"},
+    "sur":                                 {"lat": 17.07, "lon": -96.72,  "city": "Oaxaca"},
 }
 
 REG_LABEL: dict[str, str] = {
@@ -60,303 +34,459 @@ REG_LABEL: dict[str, str] = {
     "sur":                                 "Sur",
 }
 
-
-# ══════════════════════════════════════════════════════════════════════
-# UTILIDADES GEOGRÁFICAS
-# ══════════════════════════════════════════════════════════════════════
-
-def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> int:
-    """Distancia en km entre dos coordenadas (fórmula haversine)."""
-    R = 6371
-    lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
-    a = (
-        np.sin((lat2 - lat1) / 2) ** 2
-        + np.cos(lat1) * np.cos(lat2) * np.sin((lon2 - lon1) / 2) ** 2
-    )
-    return int(2 * R * np.arcsin(np.sqrt(a)))
-
-
-# ══════════════════════════════════════════════════════════════════════
-# PASO 2 — TABLA PRODUCTO × REGIÓN CON FORECAST
-# ══════════════════════════════════════════════════════════════════════
-
-def build_product_region_table(
-    df_master: pd.DataFrame,
-    subcat_region_forecast: dict[tuple[str, str], float],
-) -> pd.DataFrame:
-    """
-    Construye una tabla a nivel Producto × Región con:
-      - ventas y stock históricos promedio
-      - share de ventas dentro de su subcategoría+región
-      - demanda pronosticada para el horizonte (via forecast)
-      - surplus = stock − forecast  (exceso sobre lo que se venderá)
-
-    Parámetros
-    ----------
-    df_master               : DataFrame completo de df_Maestra
-    subcat_region_forecast  : dict {(subcat, region): demanda_total}
-
-    Retorna
-    -------
-    DataFrame con columnas:
-        Product_id, Product_name, Category, Subcategory, Region,
-        avg_sales, avg_stock, avg_sell_through, share,
-        subcat_forecast, product_forecast, surplus
-    """
-    prod_region = (
-        df_master
-        .groupby(
-            ["Product_id", "Product_name",
-             "Category", "Subcategory", "Region"]
-        )
-        .agg(
-            avg_sales=("Units_sold", "mean"),
-            avg_stock=("Stock", "mean"),
-            avg_sell_through=("Sell_through_pct", "mean"),
-        )
-        .reset_index()
-    )
-
-    # Share de cada producto dentro de su subcategoría+región
-    subcat_totals = (
-        prod_region
-        .groupby(["Subcategory", "Region"])["avg_sales"]
-        .sum()
-        .reset_index()
-        .rename(columns={"avg_sales": "subcat_total"})
-    )
-    prod_region = prod_region.merge(
-        subcat_totals, on=["Subcategory", "Region"]
-    )
-    prod_region["share"] = (
-        prod_region["avg_sales"]
-        / prod_region["subcat_total"].replace(0, np.nan)
-    ).fillna(0)
-
-    # Forecast del producto = share × forecast de su subcategoría+región
-    prod_region["subcat_forecast"] = prod_region.apply(
-        lambda r: subcat_region_forecast.get(
-            (r["Subcategory"], r["Region"]), 0.0
-        ),
-        axis=1,
-    )
-    prod_region["product_forecast"] = (
-        prod_region["share"] * prod_region["subcat_forecast"]
-    )
-
-    # Surplus = stock actual − demanda pronosticada
-    prod_region["surplus"] = (
-        prod_region["avg_stock"] - prod_region["product_forecast"]
-    ).clip(lower=0)
-
-    return prod_region
-
-
-# ══════════════════════════════════════════════════════════════════════
-# PASO 3 — GENERACIÓN DE TRANSFERENCIAS
-# ══════════════════════════════════════════════════════════════════════
-
-def build_transfer_df(
-    prod_region: pd.DataFrame,
-    horizon: int,
-    surplus_threshold: float = 50.0,
-    origen_pct: float = 0.50,
-    destino_pct: float = 0.30,
-    min_units: int = 5,
-) -> pd.DataFrame:
-    """
-    Genera el plan de transferencias sugeridas.
-
-    Lógica
-    ------
-    • Origen  : cualquier región donde surplus > surplus_threshold
-    • Destino : TODAS las demás regiones, ordenadas por mayor forecast
-                (mayor demanda pronosticada = mejor lugar para recibir)
-                Sin restricciones adicionales → todas las regiones
-                pueden mandar Y recibir.
-    • Cantidad: min(surplus × origen_pct, forecast_destino × destino_pct)
-
-    Parámetros
-    ----------
-    prod_region        : salida de build_product_region_table()
-    horizon            : meses del horizonte (para el tooltip)
-    surplus_threshold  : mínimo de exceso para ser origen (default 50 u)
-    origen_pct         : fracción del surplus que se puede enviar (0.50)
-    destino_pct        : fracción del forecast destino a cubrir (0.30)
-    min_units          : transferencia mínima en unidades (5)
-
-    Retorna
-    -------
-    DataFrame ordenado por Unidades_sugeridas desc, sin duplicados
-    (Product_id, Origen, Destino).
-    """
-    rows = []
-
-    for pid in prod_region["Product_id"].unique():
-
-        p = prod_region[prod_region["Product_id"] == pid].copy()
-
-        origins = p[p["surplus"] > surplus_threshold].sort_values(
-            "surplus", ascending=False
-        )
-        if origins.empty:
-            continue
-
-        for _, o in origins.iterrows():
-
-            remaining = o["surplus"]
-
-            dests = (
-                p[p["Region"] != o["Region"]]
-                .sort_values("product_forecast", ascending=False)
-            )
-
-            for _, d in dests.iterrows():
-
-                units = int(
-                    min(
-                        remaining * origen_pct,
-                        d["product_forecast"] * destino_pct,
-                    )
-                )
-                if units < min_units:
-                    continue
-
-                dist = haversine(
-                    REGION_COORDS[o["Region"]]["lat"],
-                    REGION_COORDS[o["Region"]]["lon"],
-                    REGION_COORDS[d["Region"]]["lat"],
-                    REGION_COORDS[d["Region"]]["lon"],
-                )
-
-                rows.append({
-                    "Product_id":           pid,
-                    "Producto":             o["Product_name"],
-                    "Categoría":            o["Category"],
-                    "Subcategoría":         o["Subcategory"],
-                    "Origen":               o["Region"],
-                    "Destino":              d["Region"],
-                    "Unidades_sugeridas":   units,
-                    "Exceso_origen":        round(o["surplus"], 0),
-                    "Forecast_destino":     round(d["product_forecast"], 0),
-                    "Sell_through_origen":  round(o["avg_sell_through"], 1),
-                    "Sell_through_destino": round(d["avg_sell_through"], 1),
-                    "Distancia_km":         dist,
-                })
-
-                remaining -= units
-                if remaining < min_units:
-                    break
-
-    return (
-        pd.DataFrame(rows)
-        .sort_values("Unidades_sugeridas", ascending=False)
-        .drop_duplicates(subset=["Product_id", "Origen", "Destino"])
-        .reset_index(drop=True)
-    )
-
-
-# ══════════════════════════════════════════════════════════════════════
-# TRAZAS DEL MAPA ANIMADO
-# ══════════════════════════════════════════════════════════════════════
-
-def make_node_trace(
-    highlight_origen: str | None = None,
-    highlight_destino: str | None = None,
-) -> go.Scattergeo:
-    """
-    Genera el trace de nodos del mapa.
-
-    Colores
-    -------
-    🔴 #ef4444  →  región que envía (origen activo)
-    🟢 #22c55e  →  región que recibe (destino activo)
-    🔵 #2563eb  →  sin movimiento en este frame
-    """
-    regions_list  = list(REGION_COORDS.keys())
-    region_lats   = [REGION_COORDS[r]["lat"] for r in regions_list]
-    region_lons   = [REGION_COORDS[r]["lon"] for r in regions_list]
-    region_cities = [REGION_COORDS[r]["city"] for r in regions_list]
-
-    colors, sizes = [], []
-    for r in regions_list:
-        if r == highlight_origen:
-            colors.append("#ef4444"); sizes.append(22)
-        elif r == highlight_destino:
-            colors.append("#22c55e"); sizes.append(22)
-        else:
-            colors.append("#2563eb"); sizes.append(15)
-
-    return go.Scattergeo(
-        lat=region_lats,
-        lon=region_lons,
-        mode="markers+text",
-        marker=dict(
-            size=sizes,
-            color=colors,
-            line=dict(width=2, color="white"),
-        ),
-        text=region_cities,
-        textposition="top center",
-        hovertext=[REG_LABEL.get(r, r) for r in regions_list],
-        hoverinfo="text",
-        showlegend=False,
-    )
-
-
-def make_route_trace(
-    row: pd.Series,
-    horizon: int,
-) -> go.Scattergeo:
-    """
-    Genera el trace de la ruta activa (línea verde) para un frame.
-
-    Parámetros
-    ----------
-    row     : fila de transfer_df
-    horizon : meses del horizonte (para el tooltip)
-    """
-    o = REGION_COORDS[row["Origen"]]
-    d = REGION_COORDS[row["Destino"]]
-
-    return go.Scattergeo(
-        lat=[o["lat"], d["lat"]],
-        lon=[o["lon"], d["lon"]],
-        mode="lines",
-        line=dict(width=5, color="#22c55e"),
-        hovertemplate=(
-            f"<b>{REG_LABEL.get(row['Origen'])} "
-            f"→ {REG_LABEL.get(row['Destino'])}</b><br>"
-            f"Producto: <b>{row['Producto']}</b><br>"
-            f"Categoría: <b>{row['Categoría']}</b><br>"
-            f"Subcategoría: <b>{row['Subcategoría']}</b><br>"
-            f"Unidades: <b>{row['Unidades_sugeridas']:,} u</b><br>"
-            f"Exceso origen: <b>{row['Exceso_origen']:,.0f} u</b><br>"
-            f"Forecast destino ({horizon} meses): "
-            f"<b>{row['Forecast_destino']:,.0f} u</b><br>"
-            f"Sell-through origen: <b>{row['Sell_through_origen']}%</b><br>"
-            f"Sell-through destino: <b>{row['Sell_through_destino']}%</b><br>"
-            f"Distancia: <b>{row['Distancia_km']:,} km</b>"
-            "<extra></extra>"
-        ),
-        showlegend=False,
-    )
-
-
-# ══════════════════════════════════════════════════════════════════════
-# LAYOUT DEL MAPA (reutilizable)
-# ══════════════════════════════════════════════════════════════════════
-
 GEO_LAYOUT = dict(
     scope="north america",
     projection_scale=4.8,
     center=dict(lat=23.6, lon=-102.5),
-    showland=True,   landcolor="#0f172a",
-    showocean=True,  oceancolor="#020617",
-    showlakes=True,  lakecolor="#020617",
+    showland=True,    landcolor="#f1f5f9",
+    showocean=True,   oceancolor="#dbeafe",
+    showlakes=True,   lakecolor="#dbeafe",
     showcountries=True,
-    countrycolor="rgba(255,255,255,.12)",
-    subunitcolor="rgba(255,255,255,.08)",
-    coastlinecolor="rgba(255,255,255,.08)",
-    bgcolor="rgba(0,0,0,0)",
+    countrycolor="rgba(100,116,139,.40)",
+    subunitcolor="rgba(100,116,139,.25)",
+    coastlinecolor="rgba(100,116,139,.25)",
+    bgcolor="#ffffff",
 )
+
+# UTILIDADES
+
+def haversine(lat1, lon1, lat2, lon2) -> int:
+    R = 6371
+    lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
+    a = (np.sin((lat2-lat1)/2)**2
+         + np.cos(lat1)*np.cos(lat2)*np.sin((lon2-lon1)/2)**2)
+    return int(2*R*np.arcsin(np.sqrt(a)))
+
+
+def get_forecast_dates(df_master: pd.DataFrame, horizon: int) -> list[date]:
+    """
+    Devuelve las fechas reales del forecast: los N meses SIGUIENTES
+    al último mes histórico en el dataset.
+    Ej: si el dataset termina en Dic 2025 → [Ene 2026, Feb 2026, Mar 2026]
+    """
+    last_month = df_master["YearMonth"].max().to_timestamp().date()
+    dates = []
+    for i in range(1, horizon + 1):
+        d = (last_month + relativedelta(months=i))
+        dates.append(date(d.year, d.month, 1))
+    return dates
+
+# PASO 1 — CLASIFICAR REGIONES: ORIGEN / DESTINO / EQUILIBRIO
+
+def build_redist_base(
+    df_master: pd.DataFrame,
+    subcat_region_forecast: dict[tuple[str,str], float],
+    horizon: int = 3,
+) -> pd.DataFrame:
+    """
+    Clasifica cada (Región, Subcategoría) como ORIGEN, DESTINO o Equilibrio.
+    Score_origen  = Gap_pct / Forecast_avg  → alto sobrestock, baja demanda
+    Score_destino = Forecast_avg / Avg_excess → alta demanda, poco exceso
+    """
+    df = df_master.copy()
+    if "Excess_stock" not in df.columns:
+        df["Excess_stock"] = (df["Stock"] - df["Units_sold"]).clip(lower=0)
+    if "Gap_pct" not in df.columns:
+        df["Gap_pct"] = (df["Excess_stock"] / df["Stock"].replace(0, np.nan) * 100)
+
+    region_sub = (
+        df.groupby(["Region","Category","Subcategory"])
+        .agg(
+            Avg_stock    = ("Stock",            "mean"),
+            Avg_excess   = ("Excess_stock",     "mean"),
+            Avg_sold     = ("Units_sold",        "mean"),
+            Gap_pct      = ("Gap_pct",           "mean"),
+            Sell_through = ("Sell_through_pct",  "mean"),
+        )
+        .reset_index()
+    )
+
+    # subcat_region_forecast devuelve la SUMA total del horizonte
+    # Dividimos por horizon para obtener el promedio MENSUAL
+    # (comparable con Avg_excess y Avg_sold que son promedios mensuales)
+    fc_rows = [
+        {"Subcategory": k[0], "Region": k[1], "Forecast_total": v}
+        for k, v in subcat_region_forecast.items()
+    ]
+    fc_df  = pd.DataFrame(fc_rows)
+    redist = region_sub.merge(fc_df, on=["Subcategory","Region"], how="left")
+    redist["Forecast_total"] = redist["Forecast_total"].fillna(0)
+    # Promedio mensual para comparar con métricas mensuales
+    redist["Forecast_avg"] = redist["Forecast_total"] / max(horizon, 1)
+
+    redist["Score_origen"]  = (
+        redist["Gap_pct"] / redist["Forecast_avg"].replace(0, np.nan)
+    ).fillna(0)
+    redist["Score_destino"] = (
+        redist["Forecast_avg"] / redist["Avg_excess"].replace(0, np.nan)
+    ).fillna(0)
+
+    p75_o = redist["Score_origen"].quantile(0.75)
+    p75_d = redist["Score_destino"].quantile(0.75)
+    max_o = redist["Score_origen"].max() or 1
+    max_d = redist["Score_destino"].max() or 1
+
+    def rol(row):
+        es_o = row["Score_origen"]  >= p75_o
+        es_d = row["Score_destino"] >= p75_d
+        if es_o and es_d:
+            return "ORIGEN" if (row["Score_origen"]/max_o) > (row["Score_destino"]/max_d) else "DESTINO"
+        if es_o: return "ORIGEN"
+        if es_d: return "DESTINO"
+        return "Equilibrio"
+
+    redist["Rol"] = redist.apply(rol, axis=1)
+    return redist
+
+# PASO 2 — FORECAST MENSUAL DETALLADO (yhat por mes, no solo promedio)
+
+@st.cache_data(show_spinner=False)
+def build_monthly_forecast(horizon: int) -> pd.DataFrame:
+    """
+    Extrae los yhat individuales mes a mes de Prophet (no el promedio).
+    Necesario para distribuir oleadas proporcionalmente a la demanda.
+    """
+    from src.forecast_engine import load_data, fit_prophet
+    df = load_data()
+    rows = []
+    for reg in df["Region"].dropna().unique():
+        for sc in df["Subcategory"].dropna().unique():
+            hist_df, fc_df = fit_prophet("Subcategory", sc, reg, horizon)
+            if hist_df is None:
+                continue
+            max_ds = hist_df["ds"].max()
+            futuro = fc_df[fc_df["ds"] > max_ds].reset_index(drop=True)
+            for i, frow in futuro.iterrows():
+                rows.append({
+                    "Region":      reg,
+                    "Subcategory": sc,
+                    "Mes_num":     i + 1,
+                    "Mes_label":   frow["ds"].strftime("%b %Y"),
+                    "Fecha_mes":   frow["ds"].date(),
+                    "yhat":        max(float(frow["yhat"]), 0),
+                })
+    return pd.DataFrame(rows)
+
+# PASO 3 — PLAN DE OLEADAS A NIVEL PRODUCTO
+# Producto más débil = mayor Gap_pct en la región origen
+# Fechas = días 1 y 15 de cada mes del forecast real
+
+def build_wave_plan(
+    df_master:    pd.DataFrame,
+    redist_base:  pd.DataFrame,
+    fc_monthly:   pd.DataFrame,
+    horizon:      int = 3,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Genera el plan de transferencias a nivel PRODUCTO con 6 oleadas.
+
+    Para cada par ORIGEN→DESTINO:
+      1. Identifica el producto más débil del origen en esa subcat
+         (mayor Gap_pct = más sobrestock relativo)
+      2. Calcula cuánto mover: min(exceso×50%, forecast_destino×35%)
+      3. Distribuye en 6 oleadas bisemanales proporcionales al yhat mensual
+      4. Fechas: días 1 y 15 de Ene, Feb, Mar 2026 (meses reales del forecast)
+
+    Retorna
+    -------
+    pares_df : un registro por par con totales
+    plan_df  : un registro por oleada × par
+    """
+    df = df_master.copy()
+    if "Excess_stock" not in df.columns:
+        df["Excess_stock"] = (df["Stock"] - df["Units_sold"]).clip(lower=0)
+    if "Gap_pct" not in df.columns:
+        df["Gap_pct"] = df["Excess_stock"] / df["Stock"].replace(0, np.nan) * 100
+
+    # Fechas reales del forecast (días 1 y 15 de cada mes pronosticado)
+    forecast_dates = get_forecast_dates(df, horizon)  # [01 Ene, 01 Feb, 01 Mar]
+    # Oleadas: día 1 y día 15 de cada mes forecast
+    oleada_dates = []
+    for fd in forecast_dates:
+        oleada_dates.append(fd)                               # día 1 del mes
+        oleada_dates.append(date(fd.year, fd.month, 15))      # día 15 del mes
+
+    # Producto más débil por subcat+región (mayor Gap_pct = más sobrestock)
+    prod_region = (
+        df.groupby(["Product_id","Product_name","Category","Subcategory","Region"])
+        .agg(
+            avg_stock    = ("Stock",            "mean"),
+            avg_excess   = ("Excess_stock",     "mean"),
+            avg_sold     = ("Units_sold",        "mean"),
+            gap_pct      = ("Gap_pct",           "mean"),
+            sell_through = ("Sell_through_pct",  "mean"),
+        )
+        .reset_index()
+    )
+
+    # Para cada subcat+región, el producto más débil = mayor gap_pct
+    weakest = (
+        prod_region
+        .sort_values("gap_pct", ascending=False)
+        .groupby(["Subcategory","Region"])
+        .first()
+        .reset_index()
+    )
+
+    # Pares ORIGEN→DESTINO de redist_base
+    origenes = redist_base[redist_base["Rol"] == "ORIGEN"][
+        ["Region","Category","Subcategory","Avg_excess","Gap_pct"]
+    ].copy()
+    destinos = redist_base[redist_base["Rol"] == "DESTINO"][
+        ["Region","Category","Subcategory","Forecast_avg"]
+    ].copy()
+
+    pares = origenes.merge(
+        destinos, on=["Category","Subcategory"],
+        suffixes=("_origen","_destino")
+    )
+    pares = pares[pares["Region_origen"] != pares["Region_destino"]].copy()
+
+    # Añadir el producto más débil del origen
+    pares = pares.merge(
+        weakest[["Subcategory","Region","Product_id","Product_name",
+                 "avg_excess","gap_pct","sell_through"]].rename(
+            columns={"Region":"Region_origen",
+                     "avg_excess":"Excess_producto",
+                     "gap_pct":"Gap_producto",
+                     "sell_through":"Sell_through_origen"}),
+        on=["Subcategory","Region_origen"],
+        how="left",
+    )
+
+    pares["Forecast_total_3m"] = pares["Forecast_avg"] * 3
+    pares["Total_transferir"]  = pares.apply(
+        lambda r: max(int(min(
+            r.get("Excess_producto", r["Avg_excess"]) * 0.50,
+            r["Forecast_total_3m"] * 0.35,
+        )), 0),
+        axis=1,
+    )
+    pares = pares[pares["Total_transferir"] > 0].reset_index(drop=True)
+
+    pares["Distancia_km"] = pares.apply(
+        lambda r: haversine(
+            REGION_COORDS[r["Region_origen"]]["lat"],
+            REGION_COORDS[r["Region_origen"]]["lon"],
+            REGION_COORDS[r["Region_destino"]]["lat"],
+            REGION_COORDS[r["Region_destino"]]["lon"],
+        ), axis=1
+    )
+
+    # Generar oleadas
+    plan_rows = []
+    for _, par in pares.iterrows():
+        subcat  = par["Subcategory"]
+        reg_dst = par["Region_destino"]
+        reg_src = par["Region_origen"]
+
+        fc_dst = (
+            fc_monthly[
+                (fc_monthly["Region"]      == reg_dst) &
+                (fc_monthly["Subcategory"] == subcat)
+            ]
+            .sort_values("Mes_num")
+            .reset_index(drop=True)
+        )
+
+        if fc_dst.empty or fc_dst["yhat"].sum() == 0:
+            yhats  = [par["Forecast_avg"]] * horizon
+            labels = [fd.strftime("%b %Y") for fd in forecast_dates]
+        else:
+            yhats  = fc_dst["yhat"].tolist()[:horizon]
+            labels = fc_dst["Mes_label"].tolist()[:horizon]
+
+        while len(yhats) < horizon:
+            yhats.append(yhats[-1] if yhats else 0)
+            labels.append(f"Mes {len(yhats)}")
+
+        total_yhat     = sum(yhats) if sum(yhats) > 0 else 1
+        oleada_units   = []
+        oleada_num     = 0
+
+        for m_idx, (yhat_m, label_m) in enumerate(zip(yhats, labels)):
+            peso_mes     = yhat_m / total_yhat
+            unidades_mes = par["Total_transferir"] * peso_mes
+
+            for bisemana in range(2):   # 0 = día 1, 1 = día 15 del mes
+                oleada_num += 1
+                fecha_real  = oleada_dates[m_idx * 2 + bisemana]
+                u           = round(unidades_mes / 2)
+                oleada_units.append(u)
+
+                plan_rows.append({
+                    "Product_id":           par.get("Product_id", ""),
+                    "Producto":             par.get("Product_name", "—"),
+                    "Subcategoría":         subcat,
+                    "Categoría":            par["Category"],
+                    "Origen":               reg_src,
+                    "Destino":              reg_dst,
+                    "Origen_label":         REG_LABEL.get(reg_src, reg_src),
+                    "Destino_label":        REG_LABEL.get(reg_dst, reg_dst),
+                    "Oleada":               oleada_num,
+                    "Fecha_envío":          fecha_real.strftime("%d %b %Y"),
+                    "Mes_num":              m_idx + 1,
+                    "Mes_pronóstico":       label_m,
+                    "Demanda_destino_mes":  round(yhat_m),
+                    "Unidades_oleada":      u,
+                    "Total_transferencia":  par["Total_transferir"],
+                    "Exceso_origen_u":      round(par.get("Excess_producto", par["Avg_excess"])),
+                    "Gap_origen_pct":       round(par.get("Gap_producto", par["Gap_pct"]), 1),
+                    "Sell_through_origen":  round(par.get("Sell_through_origen", 0), 1),
+                    "Distancia_km":         par["Distancia_km"],
+                })
+
+        # Ajuste de redondeo
+        diff = par["Total_transferir"] - sum(oleada_units)
+        if diff != 0 and plan_rows:
+            plan_rows[-1]["Unidades_oleada"] += diff
+
+    plan_df = pd.DataFrame(plan_rows).sort_values(
+        ["Subcategoría","Origen","Destino","Oleada"]
+    ).reset_index(drop=True)
+
+    return pares, plan_df
+
+# TRAZAS DEL MAPA — un frame por oleada (6 frames fijos)
+# CLAVE para que la animación funcione:
+#   todos los frames deben tener EXACTAMENTE el mismo número de traces
+#   en el mismo orden. Usamos traces vacíos para los pares inactivos.
+
+def build_animation_frames(
+    plan_df: pd.DataFrame,
+    horizon: int,
+) -> tuple:
+    """
+    Un frame por fila de plan_df, ordenado por Mes → Oleada → mayor total.
+
+    Mapa inicia LIMPIO (sin líneas).
+    Cada frame muestra UNA ruta activa + annotation con datos de la transferencia.
+    Todos los frames tienen exactamente 2 traces (nodos + ruta) → animación fluida.
+    """
+    ordered = (
+        plan_df
+        .sort_values(["Mes_num","Oleada","Total_transferencia"],
+                     ascending=[True, True, False])
+        .reset_index(drop=True)
+    )
+
+    frames, slider_steps = [], []
+    max_u_all = ordered["Unidades_oleada"].max() or 1
+
+    for i, row in ordered.iterrows():
+        o_coords = REGION_COORDS[row["Origen"]]
+        d_coords = REGION_COORDS[row["Destino"]]
+
+        node_trace = _make_nodes({row["Origen"]}, {row["Destino"]})
+
+        width = 3 + 5 * (row["Unidades_oleada"] / max_u_all)
+        route_trace = go.Scattergeo(
+            lat=[o_coords["lat"], d_coords["lat"]],
+            lon=[o_coords["lon"], d_coords["lon"]],
+            mode="lines",
+            line=dict(width=width, color="#16a34a"),
+            opacity=0.85,
+            hoverinfo="skip",
+            showlegend=False,
+        )
+
+        orig_label = REG_LABEL.get(row["Origen"], row["Origen"])
+        dest_label = REG_LABEL.get(row["Destino"], row["Destino"])
+        annotation = dict(
+            x=0.02, y=0.98,
+            xref="paper", yref="paper",
+            xanchor="left", yanchor="top",
+            text=(
+                f"<b>{row['Producto']}</b><br>"
+                f"{orig_label} → {dest_label}<br>"
+                f"<b>{row['Fecha_envío']}</b>  ·  {row['Mes_pronóstico']}<br>"
+                f"Esta oleada: <b>{int(row['Unidades_oleada']):,} u</b><br>"
+                f"Total transferencia: {int(row['Total_transferencia']):,} u<br>"
+                f"Demanda destino: {int(row['Demanda_destino_mes']):,} u/mes<br>"
+                f"Distancia: {int(row['Distancia_km']):,} km"
+            ),
+            bgcolor="rgba(255,255,255,0.92)",
+            bordercolor="rgba(148,163,184,0.6)",
+            borderwidth=1.5,
+            borderpad=10,
+            font=dict(size=11, color="#0f172a",
+                      family="Inter, system-ui, sans-serif"),
+            showarrow=False,
+            align="left",
+        )
+
+        n_total = len(ordered)
+        frames.append(go.Frame(
+            data=[node_trace, route_trace],
+            name=str(i),
+            layout=go.Layout(
+                title_text=(
+                    f"Transferencia {i+1} de {n_total}  ·  "
+                    f"Mes {int(row['Mes_num'])}  ·  "
+                    f"Oleada {int(row['Oleada'])} de 6  ·  "
+                    f"{row['Fecha_envío']}"
+                ),
+                annotations=[annotation],
+            ),
+        ))
+
+        slider_steps.append(dict(
+            args=[
+                [str(i)],
+                dict(frame=dict(duration=1800, redraw=True), mode="immediate"),
+            ],
+            label=row['Fecha_envío'],
+            method="animate",
+        ))
+
+    # Estado inicial: mapa LIMPIO, sin líneas
+    init_nodes = _make_nodes(set(), set())
+    init_route = go.Scattergeo(
+        lat=[None], lon=[None], mode="lines",
+        line=dict(width=0, color="rgba(0,0,0,0)"),
+        hoverinfo="skip", showlegend=False,
+    )
+    init_annotation = dict(
+        x=0.02, y=0.98,
+        xref="paper", yref="paper",
+        xanchor="left", yanchor="top",
+        text=(
+            f"<b>Plan de {len(ordered)} transferencias</b><br>"
+            f"Presiona ▶ Play para iniciar<br>"
+            f"Período: {ordered['Fecha_envío'].iloc[0]} – "
+            f"{ordered['Fecha_envío'].iloc[-1]}"
+        ),
+        bgcolor="rgba(255,255,255,0.92)",
+        bordercolor="rgba(148,163,184,0.6)",
+        borderwidth=1.5, borderpad=10,
+        font=dict(size=11, color="#0f172a",
+                  family="Inter, system-ui, sans-serif"),
+        showarrow=False, align="left",
+    )
+
+    return frames, slider_steps, init_nodes, [init_route], init_annotation, len(ordered)
+
+
+def _make_nodes(active_origins: set, active_dests: set) -> go.Scattergeo:
+    regions = list(REGION_COORDS.keys())
+    colors, sizes = [], []
+    for r in regions:
+        if r in active_origins:
+            colors.append("#ef4444"); sizes.append(22)   # rojo → envía (prioridad)
+        elif r in active_dests:
+            colors.append("#22c55e"); sizes.append(22)   # verde → recibe
+        else:
+            colors.append("#3b82f6"); sizes.append(14)   # azul → sin movimiento
+    return go.Scattergeo(
+        lat=[REGION_COORDS[r]["lat"] for r in regions],
+        lon=[REGION_COORDS[r]["lon"] for r in regions],
+        mode="markers+text",
+        marker=dict(size=sizes, color=colors,
+                    line=dict(width=2, color="white")),
+        text=[REGION_COORDS[r]["city"] for r in regions],
+        textposition="top center",
+        textfont=dict(size=11, color="#0f172a"),
+        hovertext=[REG_LABEL.get(r,r) for r in regions],
+        hoverinfo="text",
+        showlegend=False,
+    )
