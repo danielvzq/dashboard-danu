@@ -20,9 +20,8 @@ import streamlit as st
 from prophet import Prophet
 
 
-# ══════════════════════════════════════════════════════════════════════
+
 # CARGA Y PREPARACIÓN DE DATOS
-# ══════════════════════════════════════════════════════════════════════
 
 @st.cache_data
 def load_data() -> pd.DataFrame:
@@ -58,10 +57,7 @@ def load_data() -> pd.DataFrame:
 
     return df
 
-
-# ══════════════════════════════════════════════════════════════════════
 # MODELO PROPHET
-# ══════════════════════════════════════════════════════════════════════
 
 @st.cache_data(show_spinner=False)
 def fit_prophet(
@@ -129,10 +125,7 @@ def fit_prophet(
 
     return sub, fc
 
-
-# ══════════════════════════════════════════════════════════════════════
 # FORECAST AGREGADO POR SUBCATEGORÍA (usado en KPIs)
-# ══════════════════════════════════════════════════════════════════════
 
 def build_forecast_summary(
     df_filtrado: pd.DataFrame,
@@ -175,10 +168,7 @@ def build_forecast_summary(
 
     return pd.DataFrame(rows)
 
-
-# ══════════════════════════════════════════════════════════════════════
 # FORECAST POR SUBCATEGORÍA × REGIÓN (usado en redistribución)
-# ══════════════════════════════════════════════════════════════════════
 
 def build_subcat_region_forecast(
     df_master: pd.DataFrame,
@@ -214,10 +204,7 @@ def build_subcat_region_forecast(
 
     return result
 
-
-# ══════════════════════════════════════════════════════════════════════
 # FORECAST POR REGIÓN (tarjeta mejor/peor región — no cambia con filtros)
-# ══════════════════════════════════════════════════════════════════════
 
 @st.cache_data(show_spinner=False)
 def build_region_forecast(horizon: int) -> pd.DataFrame:
