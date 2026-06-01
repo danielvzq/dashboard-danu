@@ -262,6 +262,13 @@ if "Product_id" in df.columns and col_producto != "Product_id":
 else:
     df["Producto_label"] = df[col_producto].astype(str)
 
+df_ultimo = (
+    df.sort_values("Date")
+    .groupby("Producto_label", as_index=False)
+    .last()[["Producto_label", "Exceso_stock", "Precio_unitario"]]
+)
+df_ultimo["valor_inmovilizado_actual"] = df_ultimo["Exceso_stock"] * df_ultimo["Precio_unitario"]
+
 # =========================
 # Resumen por producto
 # =========================
@@ -273,13 +280,24 @@ producto_resumen = (
         stock_total=("Stock", "sum"),
         stock_promedio=("Stock", "mean"),
         exceso_stock=("Exceso_stock", "sum"),
-        valor_inmovilizado=("Valor_inmovilizado", "sum"),
         ventas_monto=("Sales_amount", "sum")
     )
 )
 
+producto_resumen = producto_resumen.merge(
+    df_ultimo[["Producto_label", "valor_inmovilizado_actual"]].rename(
+        columns={"valor_inmovilizado_actual": "valor_inmovilizado"}
+    ),
+    on="Producto_label",
+    how="left"
+)
+producto_resumen["valor_inmovilizado"] = producto_resumen["valor_inmovilizado"].fillna(0)
+
 producto_resumen["sell_through_estimado"] = producto_resumen.apply(
-    lambda row: safe_div(row["unidades_vendidas"], row["stock_total"]) * 100,
+    lambda row: safe_div(
+        row["unidades_vendidas"],
+        row["unidades_vendidas"] + row["stock_promedio"]
+    ) * 100,
     axis=1
 )
 

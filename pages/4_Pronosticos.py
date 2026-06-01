@@ -242,23 +242,25 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# 5 TABS
-tab_resumen, tab_demanda, tab_estacional, tab_redist, tab_plan = st.tabs([
+# 4 TABS
+tab_resumen, tab_analisis, tab_redist, tab_plan = st.tabs([
     "Resumen",
-    "Demanda",
-    "Estacionalidad",
+    "Análisis",
     "Redistribución",
     "Plan de envíos",
 ])
 
-# ─────────────────────────────────────────────────────────────────────
 # TAB 1 — RESUMEN
-# 3 tarjetas KPI + gráfica de crecimiento por subcategoría + gauge
-# ─────────────────────────────────────────────────────────────────────
+
 with tab_resumen:
 
-    c1, c2, c3 = st.columns(3)
+    st.markdown(
+        f"<p style='color:#64748b;font-size:12px;font-weight:600;margin:0 0 12px 0;'>"
+        f"Horizonte: {horizon} meses  ·  {region_label}</p>",
+        unsafe_allow_html=True,
+    )
 
+    c1, c2, c3 = st.columns(3)
     with c1:
         t1_badge, t1_accent = growth_label(kpi_growth_total, horizon)
         sign_t = "+" if kpi_growth_total >= 0 else ""
@@ -268,7 +270,6 @@ with tab_resumen:
             t1_badge, "→", t1_accent,
             min(abs(kpi_growth_total/ref25*100) if ref25>0 else 70, 100),
         ), height=150)
-
     with c2:
         components.html(metric_card(
             f"Mejor subcategoria · {horizon} meses", best_name,
@@ -276,7 +277,6 @@ with tab_resumen:
             best_badge, "+", best_accent,
             min(abs(best_pct/ref25*100) if ref25>0 else 0, 100),
         ), height=150)
-
     with c3:
         sign3 = "+" if worst_pct >= 0 else ""
         components.html(metric_card(
@@ -286,12 +286,18 @@ with tab_resumen:
             min(abs(worst_pct/ref25*100) if ref25>0 else 0, 100),
         ), height=150)
 
-    st.divider()
+    st.markdown("<br>", unsafe_allow_html=True)
 
     col_bar, col_acc = st.columns([3, 1], gap="large")
 
     with col_bar:
-        st.markdown(f"### Crecimiento por subcategoria · {region_label}")
+        st.markdown(
+            f"<p style='color:#0f172a;font-size:14px;font-weight:800;margin:0 0 4px 0;'>"
+            f"Crecimiento por subcategoría</p>"
+            f"<p style='color:#64748b;font-size:11px;font-weight:500;margin:0 0 12px 0;'>"
+            f"{region_label}  ·  Pronóstico Prophet a {horizon} meses</p>",
+            unsafe_allow_html=True,
+        )
         fc_bar     = forecast_df.sort_values("Growth_pct", ascending=False)
         colors_bar = [bar_color(v, horizon) for v in fc_bar["Growth_pct"]]
         fig_bar = go.Figure()
@@ -310,30 +316,37 @@ with tab_resumen:
             ),
         ))
         fig_bar.add_vline(x=ref15, line=dict(color="#f59e0b", width=1.5, dash="dot"),
-            annotation_text=f"15% anual ({ref15:.1f}% en {horizon}m)",
+            annotation_text=f"15% anual ({ref15:.1f}%·{horizon}m)",
             annotation_position="top", annotation_font=dict(color="#b45309", size=10))
         fig_bar.add_vline(x=ref25, line=dict(color="#16a34a", width=1.5, dash="dot"),
-            annotation_text=f"25% anual ({ref25:.1f}% en {horizon}m)",
+            annotation_text=f"25% anual ({ref25:.1f}%·{horizon}m)",
             annotation_position="top", annotation_font=dict(color="#15803d", size=10))
         fig_bar.update_layout(
-            height=300, plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+            height=320, plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
             font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
-            margin=dict(l=10, r=100, t=20, b=30),
+            margin=dict(l=10, r=110, t=10, b=30),
             yaxis=dict(autorange="reversed", tickfont=dict(size=12)),
-            xaxis=dict(title=f"Crecimiento Prophet en {horizon} meses (%)",
+            xaxis=dict(title=f"Crecimiento en {horizon} meses (%)",
                        showgrid=True, gridcolor="rgba(148,163,184,.20)",
                        zeroline=True, zerolinecolor="rgba(148,163,184,.40)", zerolinewidth=1.5),
         )
         st.plotly_chart(fig_bar, use_container_width=True)
-
+        st.caption(
+            "🟢 Crecimiento óptimo (≥25% anual)  ·  🔵 Crecimiento saludable (≥15% anual)  ·  🔴 Crecimiento moderado/descenso"
+        )
 
     with col_acc:
-        st.markdown("### Confianza del modelo")
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(
+            "<p style='color:#0f172a;font-size:14px;font-weight:800;margin:0 0 4px 0;'>"
+            "Confianza del modelo</p>"
+            "<p style='color:#64748b;font-size:11px;font-weight:500;margin:0 0 12px 0;'>"
+            "Walk-forward · datos históricos</p>",
+            unsafe_allow_html=True,
+        )
         acc_color = "#16a34a" if MODEL_ACCURACY>=85 else "#f59e0b" if MODEL_ACCURACY>=75 else "#dc2626"
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge+number", value=MODEL_ACCURACY,
-            number=dict(suffix="%", font=dict(size=32, color="#0f172a",
+            number=dict(suffix="%", font=dict(size=34, color="#0f172a",
                         family="Inter, system-ui, sans-serif")),
             gauge=dict(
                 axis=dict(range=[0,100], tickwidth=1, tickcolor="#cbd5e1",
@@ -346,25 +359,27 @@ with tab_resumen:
                 threshold=dict(line=dict(color="#0f172a", width=2),
                                thickness=0.75, value=MODEL_ACCURACY),
             ),
-            title=dict(
-                text=("Accuracy general<br>"
-                      "<span style='font-size:11px;color:#64748b'>"
-                      "Walk-forward · datos históricos</span>"),
-                font=dict(size=13, color="#0f172a",
-                          family="Inter, system-ui, sans-serif"),
-            ),
         ))
-        fig_gauge.update_layout(height=270, paper_bgcolor="#ffffff",
-            margin=dict(l=20,r=20,t=60,b=10),
-            font=dict(family="Inter, system-ui, sans-serif"))
+        fig_gauge.update_layout(
+            height=240, paper_bgcolor="#ffffff",
+            margin=dict(l=20,r=20,t=20,b=10),
+            font=dict(family="Inter, system-ui, sans-serif"),
+        )
         st.plotly_chart(fig_gauge, use_container_width=True)
+        acc_label = "Excelente" if MODEL_ACCURACY>=85 else "Aceptable" if MODEL_ACCURACY>=75 else "Bajo"
+        st.markdown(
+            f"<p style='text-align:center;color:{acc_color};font-size:12px;"
+            f"font-weight:800;margin:0;'>{acc_label} — {MODEL_ACCURACY:.1f}%</p>",
+            unsafe_allow_html=True,
+        )
 
 
-# ─────────────────────────────────────────────────────────────────────
-# TAB 2 — DEMANDA
-# Serie temporal Prophet
-# ─────────────────────────────────────────────────────────────────────
-with tab_demanda:
+
+# TAB 2 — ANÁLISIS
+
+with tab_analisis:
+
+    # ── SECCIÓN: DEMANDA PROYECTADA ───────────────────────────────────────────
 
     if product_sel != "Todas":
         @st.cache_data(show_spinner=False)
@@ -385,11 +400,13 @@ with tab_demanda:
             return sub, m.predict(future)
 
         hist_df, fc_df = fit_prophet_product(product_sel, region_prophet, horizon)
-        chart_title    = f"Demanda proyectada — {product_sel}"
+        chart_title    = product_sel
+        chart_subtitle = f"Producto  ·  {region_label}  ·  {horizon} meses"
 
     elif subcat_prophet is not None:
         hist_df, fc_df = fit_prophet("Subcategory", subcat_prophet, region_prophet, horizon)
-        chart_title    = f"Demanda proyectada — {subcat_prophet}"
+        chart_title    = subcat_prophet
+        chart_subtitle = f"Subcategoría  ·  {region_label}  ·  {horizon} meses"
 
     else:
         @st.cache_data(show_spinner=False)
@@ -410,171 +427,171 @@ with tab_demanda:
             return sub, m.predict(future)
 
         hist_df, fc_df = fit_prophet_region_total(region_prophet, horizon)
-        chart_title    = f"Demanda proyectada — {region_label} (todas las categorías)"
+        chart_title    = "Todas las categorías"
+        chart_subtitle = f"{region_label}  ·  {horizon} meses"
 
+    # ── Fila superior: título demanda + 3 KPIs inline ────────────────────────
     if hist_df is not None:
         future_fc = fc_df[fc_df["ds"] > hist_df["ds"].max()]
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
+        delta  = future_fc["yhat"].mean() - hist_df["y"].mean()
+        sign_d = "+" if delta >= 0 else ""
+        kpi_badges = (
+            f"<span style='background:#f1f5f9;border:1px solid rgba(148,163,184,.25);"
+            f"border-radius:8px;padding:3px 10px;font-size:10px;font-weight:700;"
+            f"color:#334155;margin-right:6px;white-space:nowrap;'>"
+            f"Último: {int(hist_df['y'].iloc[-1]):,} u</span>"
+            f"<span style='background:#f1f5f9;border:1px solid rgba(148,163,184,.25);"
+            f"border-radius:8px;padding:3px 10px;font-size:10px;font-weight:700;"
+            f"color:#334155;margin-right:6px;white-space:nowrap;'>"
+            f"Forecast: {int(future_fc['yhat'].mean()):,} u/mes</span>"
+            f"<span style='background:#f1f5f9;border:1px solid rgba(148,163,184,.25);"
+            f"border-radius:8px;padding:3px 10px;font-size:10px;font-weight:700;"
+            f"color:#334155;white-space:nowrap;'>"
+            f"Variación: {sign_d}{delta:,.0f} u/mes</span>"
+        )
+        st.markdown(
+            f"<p style='color:#0f172a;font-size:13px;font-weight:800;margin:0 0 4px 0;'>"
+            f"Demanda proyectada"
+            f"<span style='color:#94a3b8;font-weight:400;font-size:11px;margin-left:8px;'>"
+            f"{chart_title}  ·  {chart_subtitle}</span></p>"
+            f"<div style='margin-bottom:6px;'>{kpi_badges}</div>",
+            unsafe_allow_html=True,
+        )
+
+        fig_dem = go.Figure()
+        fig_dem.add_trace(go.Scatter(
             x=pd.concat([future_fc["ds"], future_fc["ds"][::-1]]),
             y=pd.concat([future_fc["yhat_upper"], future_fc["yhat_lower"][::-1]]),
             fill="toself", fillcolor="rgba(37,99,235,.08)",
             line=dict(color="rgba(0,0,0,0)"), hoverinfo="skip",
             name="Intervalo de confianza",
         ))
-        fig.add_trace(go.Scatter(
+        fig_dem.add_trace(go.Scatter(
             x=hist_df["ds"], y=hist_df["y"],
             mode="lines+markers", name="Histórico",
-            line=dict(color="#2563eb", width=3),
-            marker=dict(size=6, color="#2563eb"),
+            line=dict(color="#2563eb", width=2),
+            marker=dict(size=4, color="#2563eb"),
             hovertemplate="<b>%{x|%b %Y}</b><br>Ventas: %{y:,.0f} u<extra></extra>",
         ))
-        fig.add_trace(go.Scatter(
+        fig_dem.add_trace(go.Scatter(
             x=future_fc["ds"], y=future_fc["yhat"],
             mode="lines+markers",
-            name=f"Forecast Prophet ({horizon} meses)",
-            line=dict(color="#16a34a", width=3, dash="dot"),
-            marker=dict(size=9, symbol="diamond", color="#16a34a"),
+            name=f"Forecast ({horizon}m)",
+            line=dict(color="#16a34a", width=2, dash="dot"),
+            marker=dict(size=7, symbol="diamond", color="#16a34a"),
             hovertemplate="<b>%{x|%b %Y}</b><br>Forecast: %{y:,.0f} u<extra></extra>",
         ))
-        fig.update_layout(
-            title=dict(text=chart_title, font=dict(size=17, color="#0f172a")),
-            height=440, hovermode="x unified",
+        fig_dem.update_layout(
+            height=210, hovermode="x unified",
             plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
             font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
-            margin=dict(l=40, r=40, t=60, b=40),
-            xaxis=dict(title="Período", showgrid=True,
-                       gridcolor="rgba(148,163,184,.20)",
-                       linecolor="rgba(148,163,184,.30)"),
-            yaxis=dict(title="Unidades", showgrid=True,
-                       gridcolor="rgba(148,163,184,.20)",
-                       linecolor="rgba(148,163,184,.30)"),
-            legend=dict(orientation="h", y=1.06, x=0),
+            margin=dict(l=40, r=20, t=5, b=25),
+            xaxis=dict(showgrid=True, gridcolor="rgba(148,163,184,.20)",
+                       linecolor="rgba(148,163,184,.30)", tickfont=dict(size=10)),
+            yaxis=dict(title="u", showgrid=True, gridcolor="rgba(148,163,184,.20)",
+                       linecolor="rgba(148,163,184,.30)", tickfont=dict(size=10)),
+            legend=dict(orientation="h", y=1.12, x=0, font=dict(size=10)),
         )
-        st.plotly_chart(fig, use_container_width=True)
-        st.caption(
-            "Banda azul: intervalo de confianza Prophet  ·  "
-            "Línea verde punteada: demanda proyectada  ·  "
-            "Las unidades corresponden a la serie seleccionada (subcategoría, producto o región total)."
-        )
+        st.plotly_chart(fig_dem, use_container_width=True)
     else:
         nivel = "producto" if product_sel != "Todas" else "subcategoría/región"
         st.info(f"No hay suficientes datos históricos para este {nivel} (mínimo 6 meses).")
 
-# ─────────────────────────────────────────────────────────────────────
-# TAB 3 — ESTACIONALIDAD
-# Toggle: estacionalidad mensual / comparación de regiones
-# ─────────────────────────────────────────────────────────────────────
-with tab_estacional:
+    # ── Fila inferior: Estacionalidad (izq) + Comparación de regiones (der) ──
 
-    vista_opcion = st.radio(
-        "",
-        ["Estacionalidad mensual de ventas", "Comparación de regiones por forecast"],
-        horizontal=True,
-        label_visibility="collapsed",
-    )
+    # Datos de estacionalidad
+    df_seas = df_base_kpi.copy()
+    df_seas["Month"] = df_seas["Date"].dt.month
+    month_names = {1:"Ene",2:"Feb",3:"Mar",4:"Abr",5:"May",6:"Jun",
+                   7:"Jul",8:"Ago",9:"Sep",10:"Oct",11:"Nov",12:"Dic"}
+    seasonality = df_seas.groupby("Month")["Units_sold"].mean().reset_index()
+    seasonality["Month_name"] = seasonality["Month"].map(month_names)
+    seasonality = seasonality.sort_values("Month")
+    global_avg  = seasonality["Units_sold"].mean()
+    seas_colors = [
+        "#16a34a" if v >= global_avg*1.05
+        else "#dc2626" if v <= global_avg*0.95
+        else "#2563eb"
+        for v in seasonality["Units_sold"]
+    ]
+    peak_month   = seasonality.loc[seasonality["Units_sold"].idxmax(), "Month_name"]
+    variabilidad = (seasonality["Units_sold"].max() - seasonality["Units_sold"].min()) / global_avg * 100
 
-    if vista_opcion == "Estacionalidad mensual de ventas":
-        st.caption("Promedio histórico de ventas por mes del año.")
+    # Datos de comparación de regiones
+    with st.spinner("Calculando..."):
+        fc3 = build_region_forecast(3)
+        fc6 = build_region_forecast(6)
+    fc3 = fc3.rename(columns={"Forecast_total":"fc3","Growth_pct":"gp3"})
+    fc6 = fc6.rename(columns={"Forecast_total":"fc6","Growth_pct":"gp6"})
+    region_compare = fc3[["Region_label","Hist_avg","fc3","gp3"]].merge(
+        fc6[["Region_label","fc6","gp6"]], on="Region_label"
+    ).sort_values("fc6", ascending=True)
 
-        df_seas = df_base_kpi.copy()
-        df_seas["Month"] = df_seas["Date"].dt.month
-        month_names = {1:"Ene",2:"Feb",3:"Mar",4:"Abr",5:"May",6:"Jun",
-                       7:"Jul",8:"Ago",9:"Sep",10:"Oct",11:"Nov",12:"Dic"}
-        seasonality = df_seas.groupby("Month")["Units_sold"].mean().reset_index()
-        seasonality["Month_name"] = seasonality["Month"].map(month_names)
-        seasonality = seasonality.sort_values("Month")
-        global_avg  = seasonality["Units_sold"].mean()
-        seas_colors = [
-            "#16a34a" if v>=global_avg*1.05
-            else "#dc2626" if v<=global_avg*0.95
-            else "#2563eb"
-            for v in seasonality["Units_sold"]
-        ]
+    col_seas, col_reg = st.columns([1, 1], gap="large")
 
+    with col_seas:
+        st.markdown(
+            f"<p style='color:#0f172a;font-size:12px;font-weight:800;margin:0 0 1px 0;'>"
+            f"Estacionalidad mensual"
+            f"<span style='color:#94a3b8;font-weight:400;font-size:10px;margin-left:6px;'>"
+            f"Pico: {peak_month}  ·  Variabilidad: {variabilidad:.1f}%</span></p>",
+            unsafe_allow_html=True,
+        )
         fig_seas = go.Figure()
         fig_seas.add_hline(y=global_avg,
-            line=dict(color="#94a3b8", width=1.5, dash="dot"),
-            annotation_text="Promedio", annotation_position="right",
-            annotation_font=dict(color="#64748b", size=11))
+            line=dict(color="#94a3b8", width=1, dash="dot"),
+            annotation_text="Prom.", annotation_position="right",
+            annotation_font=dict(color="#64748b", size=9))
         fig_seas.add_trace(go.Bar(
             x=seasonality["Month_name"], y=seasonality["Units_sold"],
             marker=dict(color=seas_colors, opacity=0.88),
-            text=[f"{v:,.0f}" for v in seasonality["Units_sold"]],
-            textposition="outside",
-            hovertemplate="<b>%{x}</b><br>Promedio: %{y:,.0f} u<extra></extra>",
+            hovertemplate="<b>%{x}</b><br>%{y:,.0f} u<extra></extra>",
         ))
         fig_seas.update_layout(
-            height=380, plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+            height=200, plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
             font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
-            margin=dict(l=10, r=40, t=20, b=40),
-            xaxis=dict(title="Mes", showgrid=False),
-            yaxis=dict(title="Ventas promedio (u)", showgrid=True,
-                       gridcolor="rgba(148,163,184,.20)"),
+            margin=dict(l=10, r=30, t=8, b=25),
+            xaxis=dict(showgrid=False, tickfont=dict(size=10)),
+            yaxis=dict(showgrid=True, gridcolor="rgba(148,163,184,.20)",
+                       tickfont=dict(size=9)),
         )
         st.plotly_chart(fig_seas, use_container_width=True)
-        st.caption(
-            "Verde: >5% sobre el promedio  ·  Rojo: >5% bajo el promedio  ·  "
-            "Azul: dentro del rango  ·  Datos históricos, no Prophet."
+
+    with col_reg:
+        st.markdown(
+            "<p style='color:#0f172a;font-size:12px;font-weight:800;margin:0 0 1px 0;'>"
+            "Comparación de regiones"
+            "<span style='color:#94a3b8;font-weight:400;font-size:10px;margin-left:6px;'>"
+            "Forecast Prophet · dataset completo</span></p>",
+            unsafe_allow_html=True,
         )
-
-    else:
-        st.caption("Demanda total proyectada por Prophet para cada región. Sin filtros, dataset completo.")
-
-        with st.spinner("Calculando..."):
-            fc3 = build_region_forecast(3)
-            fc6 = build_region_forecast(6)
-
-        fc3 = fc3.rename(columns={"Forecast_total":"fc3","Growth_pct":"gp3"})
-        fc6 = fc6.rename(columns={"Forecast_total":"fc6","Growth_pct":"gp6"})
-        region_compare = fc3[["Region_label","Hist_avg","fc3","gp3"]].merge(
-            fc6[["Region_label","fc6","gp6"]], on="Region_label"
-        ).sort_values("fc6", ascending=True)
-
         fig_comp = go.Figure()
         fig_comp.add_trace(go.Bar(
-            name="Forecast 3 meses",
-            y=region_compare["Region_label"],
-            x=region_compare["fc3"],
-            orientation="h",
-            marker=dict(color="#2563eb", opacity=0.80),
+            name="3 m", y=region_compare["Region_label"], x=region_compare["fc3"],
+            orientation="h", marker=dict(color="#2563eb", opacity=0.80),
             hovertemplate="<b>%{y}</b><br>3 meses: %{x:,.0f} u<extra></extra>",
         ))
         fig_comp.add_trace(go.Bar(
-            name="Forecast 6 meses",
-            y=region_compare["Region_label"],
-            x=region_compare["fc6"],
-            orientation="h",
-            marker=dict(color="#16a34a", opacity=0.80),
+            name="6 m", y=region_compare["Region_label"], x=region_compare["fc6"],
+            orientation="h", marker=dict(color="#16a34a", opacity=0.80),
             hovertemplate="<b>%{y}</b><br>6 meses: %{x:,.0f} u<extra></extra>",
         ))
         fig_comp.update_layout(
             barmode="group",
-            height=300, plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+            height=200, plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
             font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
-            margin=dict(l=10, r=40, t=20, b=40),
-            legend=dict(orientation="h", y=1.06, x=0),
-            yaxis=dict(tickfont=dict(size=12)),
-            xaxis=dict(title="Unidades proyectadas", showgrid=True,
-                       gridcolor="rgba(148,163,184,.20)"),
+            margin=dict(l=10, r=10, t=8, b=25),
+            legend=dict(orientation="h", y=1.12, x=0, font=dict(size=10)),
+            yaxis=dict(tickfont=dict(size=10)),
+            xaxis=dict(showgrid=True, gridcolor="rgba(148,163,184,.20)",
+                       tickfont=dict(size=9)),
         )
         st.plotly_chart(fig_comp, use_container_width=True)
 
-        tabla = region_compare.copy()
-        tabla.columns = ["Región","Promedio hist. mensual","Forecast 3m",
-                         "Crec. 3m (%)","Forecast 6m","Crec. 6m (%)"]
-        tabla["Promedio hist. mensual"] = tabla["Promedio hist. mensual"].map("{:,.0f}".format)
-        tabla["Forecast 3m"]  = tabla["Forecast 3m"].map("{:,.0f}".format)
-        tabla["Forecast 6m"]  = tabla["Forecast 6m"].map("{:,.0f}".format)
-        tabla["Crec. 3m (%)"] = tabla["Crec. 3m (%)"].map("{:+.1f}%".format)
-        tabla["Crec. 6m (%)"] = tabla["Crec. 6m (%)"].map("{:+.1f}%".format)
-        st.dataframe(tabla.sort_values("Forecast 6m", ascending=False),
-                     use_container_width=True, hide_index=True, height=160)
 
-# ─────────────────────────────────────────────────────────────────────
 # TAB 4 — REDISTRIBUCIÓN
 # Mapa animado + KPIs + leyenda
-# ─────────────────────────────────────────────────────────────────────
+
 with tab_redist:
 
     col_title_r, col_pop1, col_pop2 = st.columns([4, 1, 1])
@@ -693,10 +710,10 @@ with tab_redist:
     )
 
 
-# ─────────────────────────────────────────────────────────────────────
+
 # TAB 5 — PLAN DE ENVÍOS
 # Tabla de transferencias + resumen ejecutivo + barras de oleadas
-# ─────────────────────────────────────────────────────────────────────
+
 with tab_plan:
 
     st.markdown("**Plan detallado de transferencias**")
