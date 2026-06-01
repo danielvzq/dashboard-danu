@@ -1,17 +1,65 @@
 import streamlit as st
-import streamlit_shadcn_ui as ui
 import streamlit.components.v1 as components
-from html import escape 
+from html import escape
 import pandas as pd
 import plotly.graph_objects as go
 from pathlib import Path
+
 
 # =========================
 # Configuración de página
 # =========================
 st.set_page_config(
-    layout="wide"
+    layout="wide",
+    page_title="Dashboard Danu",
+    page_icon="📦"
 )
+
+
+# =========================
+# CSS general compacto
+# =========================
+st.markdown(
+    """
+    <style>
+        .block-container {
+            padding-top: 2.2rem !important;
+            padding-bottom: 0.8rem !important;
+            padding-left: 1.4rem !important;
+            padding-right: 1.4rem !important;
+            max-width: 100% !important;
+        }
+
+        h1, h2, h3 {
+            margin-top: 0 !important;
+            margin-bottom: 0.6rem !important;
+        }
+
+        .main-title {
+            color: white;
+            font-size: 30px;
+            font-weight: 950;
+            letter-spacing: -0.8px;
+            margin: 0 0 16px 0;
+            line-height: 1.2;
+        }
+
+        div[data-testid="stVerticalBlock"] {
+            gap: 0.65rem !important;
+        }
+
+        div[data-testid="stHorizontalBlock"] {
+            gap: 0.8rem !important;
+        }
+
+        iframe {
+            display: block;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 
 # =========================
 # Cargar CSS personalizado
@@ -19,8 +67,32 @@ st.set_page_config(
 css_path = Path("styles/main.css")
 
 if css_path.exists():
-    with open(css_path) as f:
+    with open(css_path, encoding="utf-8") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+
+# =========================
+# Funciones auxiliares
+# =========================
+def safe_mean(series):
+    value = (
+        pd.to_numeric(series, errors="coerce")
+        .replace([float("inf"), -float("inf")], pd.NA)
+        .dropna()
+        .mean()
+    )
+
+    if pd.isna(value):
+        return 0
+
+    return float(value)
+
+
+def safe_float(value, default=0):
+    if pd.isna(value):
+        return default
+    return float(value)
+
 
 # =========================
 # Cargar datos
@@ -31,7 +103,6 @@ def cargar_datos():
     df = pd.read_csv(ruta)
 
     df.columns = df.columns.str.strip()
-
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
 
     df["Overstock_critico"] = (
@@ -48,6 +119,7 @@ def cargar_datos():
 
 
 df_maestra = cargar_datos()
+
 
 # =========================
 # Sidebar - Filtros
@@ -111,10 +183,10 @@ with st.sidebar:
         default=acciones
     )
 
+
 # =========================
 # Aplicar filtros
 # =========================
-
 df_filtrado = df_maestra.copy()
 
 if isinstance(rango_fechas, tuple) and len(rango_fechas) == 2:
@@ -139,6 +211,7 @@ if acciones_seleccionadas:
         df_filtrado["Priority_action"].isin(acciones_seleccionadas)
     ]
 
+
 # =========================
 # Cálculos principales
 # =========================
@@ -158,51 +231,28 @@ porcentaje_stock_critico = (
     else 0
 )
 
-sell_through_promedio = df_filtrado["Sell_through_pct"].mean()
+dias_promedio_inventario = safe_mean(df_filtrado["Days_inventory"])
+dias_promedio_critico = safe_mean(df_critico["Days_inventory"]) if not df_critico.empty else 0
 
-dias_promedio_inventario = df_filtrado["Days_inventory"].replace([float("inf"), -float("inf")], pd.NA).dropna().mean()
+rotacion_promedio = safe_mean(df_filtrado["Stock_turnover"])
+rotacion_critica = safe_mean(df_critico["Stock_turnover"]) if not df_critico.empty else 0
 
-dias_promedio_critico = (
-    df_critico["Days_inventory"].replace([float("inf"), -float("inf")], pd.NA).dropna().mean()
-    if not df_critico.empty
-    else 0
-)
+progreso_overstock = safe_float(porcentaje_stock_critico)
+progreso_dias = min((dias_promedio_inventario / 365) * 100, 100)
+progreso_rotacion = min((rotacion_promedio / 1) * 100, 100)
 
-accion_prioritaria = (
-    df_critico["Priority_action"].mode()[0]
-    if not df_critico.empty
-    else "Sin acción crítica"
-)
-
-rotacion_promedio = df_filtrado["Stock_turnover"].replace(
-    [float("inf"), -float("inf")], pd.NA
-).dropna().mean()
-
-rotacion_critica = (
-    df_critico["Stock_turnover"].replace(
-        [float("inf"), -float("inf")], pd.NA
-    ).dropna().mean()
-    if not df_critico.empty
-    else 0
-)
 
 # =========================
-# Encabezado
+# Tarjeta compacta superior
 # =========================
-st.title("Panel de Control Principal")
-
-# =========================
-# Tarjetas superiores modernas
-# =========================
-
-def modern_metric_card(title, value, description, badge, icon, accent_color, progress):
+def compact_metric_card(title, value, description, badge, icon, accent_color, progress):
     title = escape(str(title))
     value = escape(str(value))
     description = escape(str(description))
     badge = escape(str(badge))
     icon = escape(str(icon))
 
-    progress = max(0, min(progress, 100))
+    progress = max(0, min(safe_float(progress), 100))
 
     return f"""
 <!DOCTYPE html>
@@ -216,91 +266,80 @@ def modern_metric_card(title, value, description, badge, icon, accent_color, pro
     }}
 
     .metric-card {{
+        height: 132px;
+        box-sizing: border-box;
+        border-radius: 20px;
+        padding: 14px 16px;
         background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
         border: 1px solid rgba(148, 163, 184, 0.22);
-        border-radius: 26px;
-        padding: 28px;
-        height: 190px;
-        box-sizing: border-box;
-        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.10);
-        position: relative;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
         overflow: hidden;
-    }}
-
-    .metric-card::before {{
-        content: "";
-        position: absolute;
-        top: -40px;
-        right: -40px;
-        width: 120px;
-        height: 120px;
-        opacity: 0.10;
-        border-radius: 999px;
     }}
 
     .metric-top {{
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 18px;
+        margin-bottom: 8px;
     }}
 
     .metric-title {{
         color: #0f172a;
-        font-size: 17px;
+        font-size: 13px;
         font-weight: 900;
         margin: 0;
     }}
 
     .metric-icon {{
-        width: 38px;
-        height: 38px;
-        border-radius: 14px;
+        width: 30px;
+        height: 30px;
+        border-radius: 11px;
         background: {accent_color};
         color: white;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 19px;
-        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.18);
+        font-size: 15px;
     }}
 
     .metric-value {{
         color: #0f172a;
-        font-size: 28px;
+        font-size: 23px;
         font-weight: 950;
-        letter-spacing: -1.6px;
+        letter-spacing: -1px;
         line-height: 1;
         margin: 0;
     }}
 
     .metric-description {{
         color: #64748b;
-        font-size: 14px;
+        font-size: 11px;
         font-weight: 650;
-        margin: 10px 0 0 0;
+        margin: 5px 0 8px 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }}
 
     .metric-footer {{
         display: flex;
         align-items: center;
-        gap: 10px;
-        margin-top: 18px;
+        gap: 8px;
     }}
 
     .metric-badge {{
         background: rgba(15, 23, 42, 0.06);
         color: #334155;
-        font-size: 12px;
+        font-size: 10px;
         font-weight: 800;
-        padding: 6px 10px;
+        padding: 4px 8px;
         border-radius: 999px;
         white-space: nowrap;
     }}
 
     .metric-track {{
         flex: 1;
-        height: 8px;
+        height: 6px;
         background: #e5e7eb;
         border-radius: 999px;
         overflow: hidden;
@@ -336,15 +375,24 @@ def modern_metric_card(title, value, description, badge, icon, accent_color, pro
 </html>
 """
 
-progreso_overstock = porcentaje_stock_critico
-progreso_dias = min((dias_promedio_inventario / 365) * 100, 100)
-progreso_rotacion = min((rotacion_promedio / 1) * 100, 100)
 
+# =========================
+# Encabezado
+# =========================
+st.markdown(
+    '<h1 class="main-title">Panel de Control Principal</h1>',
+    unsafe_allow_html=True
+)
+
+
+# =========================
+# Fila superior: 3 tarjetas
+# =========================
 col1, col2, col3 = st.columns(3)
 
 with col1:
     components.html(
-        modern_metric_card(
+        compact_metric_card(
             title="Overstock Crítico",
             value=f"{productos_criticos:,} productos",
             description=f"{unidades_excedentes:,.0f} unidades excedentes",
@@ -353,13 +401,13 @@ with col1:
             accent_color="#dc2626",
             progress=progreso_overstock
         ),
-        height=210,
+        height=145,
         scrolling=False
     )
 
 with col2:
     components.html(
-        modern_metric_card(
+        compact_metric_card(
             title="Días Prom. Inventario",
             value=f"{dias_promedio_inventario:.0f} días",
             description=f"{dias_promedio_critico:.0f} días en productos críticos",
@@ -368,13 +416,13 @@ with col2:
             accent_color="#f59e0b",
             progress=progreso_dias
         ),
-        height=245,
+        height=145,
         scrolling=False
     )
 
 with col3:
     components.html(
-        modern_metric_card(
+        compact_metric_card(
             title="Rotación Inventario",
             value=f"{rotacion_promedio:.2f}x",
             description=f"{rotacion_critica:.2f}x en productos críticos",
@@ -383,16 +431,15 @@ with col3:
             accent_color="#2563eb",
             progress=progreso_rotacion
         ),
-        height=245,
+        height=145,
         scrolling=False
     )
 
-# =========================
-# Ventas vs Stock
-# =========================
 
+# =========================
+# Datos para gráfica
+# =========================
 df_mes = df_filtrado.copy()
-
 df_mes["Mes"] = df_mes["Date"].dt.to_period("M").dt.to_timestamp()
 
 ventas_stock_mes = (
@@ -415,7 +462,6 @@ fig.add_trace(
         x=ventas_stock_mes["Mes_texto"],
         y=ventas_stock_mes["Units_sold"],
         name="Unidades vendidas",
-        yaxis="y",
         hovertemplate="<b>%{x}</b><br>Unidades vendidas: %{y:,.0f}<extra></extra>"
     )
 )
@@ -432,16 +478,13 @@ fig.add_trace(
 )
 
 fig.update_layout(
-    title="Unidades vendidas vs stock por mes",
-    xaxis=dict(
-        title="Mes"
-    ),
-    yaxis=dict(
-        title="Unidades vendidas",
-        showgrid=True
-    ),
+    title="",
+    height=310,
+    margin=dict(l=35, r=35, t=10, b=35),
+    xaxis=dict(title=None),
+    yaxis=dict(title="Vendidas", showgrid=True),
     yaxis2=dict(
-        title="Stock total",
+        title="Stock",
         overlaying="y",
         side="right",
         showgrid=False
@@ -449,19 +492,17 @@ fig.update_layout(
     legend=dict(
         orientation="h",
         yanchor="bottom",
-        y=1.02,
+        y=1.03,
         xanchor="right",
         x=1
     ),
-    height=500,
-    margin=dict(l=40, r=40, t=80, b=40),
     hovermode="x unified"
 )
 
-# =========================
-# Tarjetas modernas debajo de la gráfica
-# =========================
 
+# =========================
+# Datos para panel lateral
+# =========================
 df_cards = df_filtrado.copy()
 
 if "Exceso_stock" not in df_cards.columns:
@@ -478,45 +519,53 @@ porcentaje_ventas = (
     else 0
 )
 
-sell_through_rate = (
-    df_cards["Sell_through_pct"]
-    .replace([float("inf"), -float("inf")], pd.NA)
-    .dropna()
-    .mean()
-)
-
-if pd.isna(sell_through_rate):
-    sell_through_rate = 0
+sell_through_rate = safe_mean(df_cards["Sell_through_pct"])
 
 if sell_through_rate <= 1:
     sell_through_rate = sell_through_rate * 100
 
 ventas_unidades_totales = df_cards["Units_sold"].sum()
-ventas_monto_totales = df_cards["Sales_amount"].sum()
-registros_ventas = df_cards.shape[0]
 
-top5_sobrestock = ( #Cambiar a subcategoría
+# =========================
+# Top 5 productos con mayor sobrestock
+# =========================
+col_producto = "Product_name" if "Product_name" in df_cards.columns else "Product_id"
+
+if col_producto == "Product_name" and "Product_id" in df_cards.columns:
+    df_cards["Etiqueta_producto"] = (
+        df_cards["Product_name"].astype(str).str.strip()
+        + " · ID "
+        + df_cards["Product_id"].astype(str)
+    )
+else:
+    df_cards["Etiqueta_producto"] = df_cards[col_producto].astype(str)
+
+top5_sobrestock = (
     df_cards
-    .groupby("Category", as_index=False)["Exceso_stock"]
+    .groupby("Etiqueta_producto", as_index=False)["Exceso_stock"]
     .sum()
     .sort_values("Exceso_stock", ascending=False)
     .head(5)
 )
 
-max_sobrestock = top5_sobrestock["Exceso_stock"].max() if not top5_sobrestock.empty else 1
+max_sobrestock = (
+    top5_sobrestock["Exceso_stock"].max()
+    if not top5_sobrestock.empty
+    else 1
+)
 
 top5_items_html = ""
 
 for _, row in top5_sobrestock.iterrows():
-    categoria_item = escape(str(row["Category"]))
+    producto_item = escape(str(row["Etiqueta_producto"]))
     exceso = row["Exceso_stock"]
     porcentaje_barra = (exceso / max_sobrestock) * 100 if max_sobrestock > 0 else 0
 
     top5_items_html += f"""
     <div class="ranking-item">
         <div class="ranking-top">
-            <span class="ranking-name">{categoria_item}</span>
-            <span class="ranking-value">{exceso:,.0f}</span>
+            <span class="product-name">{producto_item}</span>
+            <strong>{exceso:,.0f}</strong>
         </div>
         <div class="bar-track">
             <div class="bar-fill" style="width:{porcentaje_barra:.1f}%;"></div>
@@ -524,8 +573,10 @@ for _, row in top5_sobrestock.iterrows():
     </div>
     """
 
-
-resumen_ventas_card_html = f"""
+# =========================
+# Panel lateral compacto
+# =========================
+side_panel_html = f"""
 <!DOCTYPE html>
 <html>
 <head>
@@ -536,309 +587,104 @@ resumen_ventas_card_html = f"""
         background: transparent;
     }}
 
-        .sales-card {{
-        min-height: 390px;
-        height: auto;
+    .side-card {{
+        height: 250px;
         box-sizing: border-box;
-        border-radius: 28px;
-        padding: 30px;
-        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        border: 1px solid rgba(148, 163, 184, 0.22);
-        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.10);
-        overflow: hidden;
-        position: relative;
-    }}
-
-    .sales-card::before {{
-        content: "";
-        position: absolute;
-        top: -70px;
-        right: -70px;
-        width: 190px;
-        height: 190px;
-        opacity: 0.10;
-        border-radius: 999px;
-    }}
-
-    .header {{
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 22px;
-        position: relative;
-        z-index: 2;
-    }}
-
-    .title {{
-        color: #0f172a;
-        font-size: 20px;
-        font-weight: 950;
-        margin: 0;
-    }}
-
-    .badge {{
-        background: #ecfdf5;
-        color: #047857;
-        padding: 8px 12px;
-        border-radius: 999px;
-        font-size: 12px;
-        font-weight: 850;
-        white-space: nowrap;
-    }}
-
-    .main-grid {{
-        display: grid;
-        grid-template-columns: 1.15fr 1fr;
-        gap: 24px;
-        align-items: stretch;
-        position: relative;
-        z-index: 2;
-    }}
-
-    .main-metric {{
-        background: rgba(255, 255, 255, 0.76);
-        border: 1px solid rgba(148, 163, 184, 0.20);
         border-radius: 24px;
-        padding: 24px;
-        min-height: 230px;
-        box-sizing: border-box;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-    }}
-
-    .metric-label {{
-        color: #64748b;
-        font-size: 13px;
-        font-weight: 800;
-        margin: 0 0 12px 0;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }}
-
-    .metric-value-big {{
-        color: #0f172a;
-        font-size: 56px;
-        font-weight: 950;
-        letter-spacing: -2.5px;
-        line-height: 1;
-        margin: 0;
-    }}
-
-    .metric-description {{
-        color: #64748b;
-        font-size: 14px;
-        font-weight: 650;
-        line-height: 1.45;
-        margin: 14px 0 0 0;
-    }}
-
-    .progress-track {{
-        width: 100%;
-        height: 11px;
-        background: #e5e7eb;
-        border-radius: 999px;
-        margin-top: 20px;
-        overflow: hidden;
-    }}
-
-    .progress-fill {{
-        height: 100%;
-        width: {min(porcentaje_ventas, 100):.1f}%;
-        background: linear-gradient(90deg, #22c55e, #15803d);
-        border-radius: 999px;
-    }}
-
-    .side-metrics {{
-        display: grid;
-        grid-template-rows: repeat(2, minmax(0, 1fr));
-        gap: 18px;
-        height: 100%;
-    }}
-
-    .mini-card {{
-        background: rgba(255, 255, 255, 0.78);
-        border: 1px solid rgba(148, 163, 184, 0.20);
-        border-radius: 22px;
-        padding: 20px 24px;
-        box-sizing: border-box;
-        min-height: 106px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-    }}
-
-    .mini-top {{
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 10px;
-    }}
-
-    .mini-label {{
-        color: #64748b;
-        font-size: 12px;
-        font-weight: 850;
-        margin: 0;
-        text-transform: uppercase;
-        letter-spacing: 0.45px;
-    }}
-
-    .mini-icon {{
-        width: 32px;
-        height: 32px;
-        border-radius: 12px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        color: white;
-        font-size: 16px;
-        font-weight: 900;
-    }}
-
-    .green {{
-        background: #16a34a;
-    }}
-
-    .blue {{
-        background: #2563eb;
-    }}
-
-    .mini-value {{
-        color: #0f172a;
-        font-size: 30px;
-        font-weight: 950;
-        line-height: 1;
-        letter-spacing: -1px;
-        margin: 0;
-    }}
-
-    .mini-description {{
-        color: #64748b;
-        font-size: 13px;
-        font-weight: 650;
-        margin: 8px 0 0 0;
-        line-height: 1.35;
-    }}
-
-    .footer {{
-        color: #94a3b8;
-        font-size: 12px;
-        font-weight: 650;
-        margin-top: 14px;
-    }}
-</style>
-</head>
-
-<body>
-    <div class="sales-card">
-        <div class="header">
-            <p class="title">Resumen de ventas</p>
-            <span class="badge">Filtros actuales</span>
-        </div>
-
-        <div class="main-grid">
-            <div class="main-metric">
-                <p class="metric-label">% de ventas</p>
-                <h1 class="metric-value-big">{porcentaje_ventas:.1f}%</h1>
-                <p class="metric-description">
-                    ${ventas_filtradas_total:,.2f} de ${ventas_generales_total:,.2f} en ventas totales.
-                </p>
-
-                <div class="progress-track">
-                    <div class="progress-fill"></div>
-                </div>
-
-                <p class="footer">
-                    Participación de las ventas filtradas sobre el total general.
-                </p>
-            </div>
-
-            <div class="side-metrics">
-                <div class="mini-card">
-                    <div class="mini-top">
-                        <p class="mini-label">Sell-through rate</p>
-                        <div class="mini-icon green">↗</div>
-                    </div>
-                    <h2 class="mini-value">{sell_through_rate:.1f}%</h2>
-                    <p class="mini-description">
-                        Inventario vendido promedio.
-                    </p>
-                </div>
-
-                <div class="mini-card">
-                    <div class="mini-top">
-                        <p class="mini-label">Ventas totales</p>
-                        <div class="mini-icon blue">🛒</div>
-                    </div>
-                    <h2 class="mini-value">{ventas_unidades_totales:,.0f}</h2>
-                    <p class="mini-description">
-                        Unidades vendidas · {registros_ventas:,} registros.
-                    </p>
-                </div>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
-"""
-
-
-top5_card_html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-<style>
-    body {{
-        margin: 0;
-        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: transparent;
-    }}
-
-    .card {{
+        padding: 20px 22px;
         background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
         border: 1px solid rgba(148, 163, 184, 0.22);
-        border-radius: 28px;
-        padding: 34px;
-        height: 330px;
-        box-sizing: border-box;
-        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.10);
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
         overflow: hidden;
     }}
 
     .title {{
         color: #0f172a;
-        font-size: 20px;
+        font-size: 18px;
+        font-weight: 950;
+        margin: 0 0 14px 0;
+    }}
+
+    .content-grid {{
+        display: grid;
+        grid-template-columns: 0.95fr 1.4fr;
+        gap: 22px;
+        align-items: start;
+    }}
+
+    .kpi-grid {{
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    width: 100%;
+}}
+
+.kpi-wide {{
+    grid-column: 1 / span 2;
+}}
+
+.kpi {{
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    padding: 14px 12px;
+    min-height: 74px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}}
+
+.kpi-label {{
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 850;
+    text-transform: uppercase;
+    margin: 0 0 8px 0;
+    white-space: nowrap;
+}}
+
+.kpi-value {{
+    color: #0f172a;
+    font-size: 24px;
+    font-weight: 950;
+    letter-spacing: -0.8px;
+    line-height: 1;
+    margin: 0;
+}}
+
+.kpi-value-wide {{
+    font-size: 28px;
+}}
+
+    .section-title {{
+        color: #0f172a;
+        font-size: 14px;
         font-weight: 900;
-        margin: 0 0 26px 0;
+        margin: 0 0 10px 0;
     }}
 
     .ranking-item {{
-        margin-bottom: 18px;
+        margin-bottom: 8px;
     }}
 
     .ranking-top {{
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 8px;
-    }}
-
-    .ranking-name {{
+        margin-bottom: 4px;
         color: #111827;
-        font-size: 15px;
-        font-weight: 850;
+        font-size: 12px;
+        font-weight: 800;
     }}
 
-    .ranking-value {{
+    .ranking-top strong {{
         color: #dc2626;
-        font-size: 15px;
-        font-weight: 900;
+        font-size: 12px;
     }}
 
     .bar-track {{
         width: 100%;
-        height: 8px;
+        height: 7px;
         background: #fee2e2;
         border-radius: 999px;
         overflow: hidden;
@@ -852,50 +698,58 @@ top5_card_html = f"""
 
     .footer {{
         color: #94a3b8;
-        font-size: 13px;
-        font-weight: 600;
-        margin-top: 20px;
+        font-size: 10px;
+        font-weight: 650;
+        margin-top: 6px;
     }}
 </style>
 </head>
 
 <body>
-    <div class="card">
-        <p class="title">Top 5 categorías con mayor sobrestock</p>
+    <div class="side-card">
 
-        {top5_items_html}
+        <div class="content-grid">
+            <div class="kpi-grid">
+    <div class="kpi">
+        <p class="kpi-label">% ventas</p>
+        <p class="kpi-value">{porcentaje_ventas:.1f}%</p>
+    </div>
 
-        <p class="footer">
-            Medido por unidades excedentes de stock.
-        </p>
+    <div class="kpi">
+        <p class="kpi-label">Sell-through</p>
+        <p class="kpi-value">{sell_through_rate:.1f}%</p>
+    </div>
+
+    <div class="kpi kpi-wide">
+        <p class="kpi-label">Ventas</p>
+        <p class="kpi-value kpi-value-wide">{ventas_unidades_totales:,.0f}</p>
+    </div>
+</div>
+
+            <div>
+                <p class="section-title">Top 5 productos con mayor sobrestock</p>
+
+                {top5_items_html}
+
+                <p class="footer">
+                    Medido por unidades excedentes de stock.
+                </p>
+            </div>
+        </div>
     </div>
 </body>
 </html>
 """
 
-st.markdown("<br>", unsafe_allow_html=True)
 
-# Tarjeta de Top 5 
-components.html(top5_card_html, height=360, scrolling=False)
+st.plotly_chart(
+    fig,
+    use_container_width=True,
+    config={"displayModeBar": False}
+)
 
-# =========================
-# Pestañas
-# =========================
-st.markdown("### Detalles Operativos")
-
-st.plotly_chart(fig, use_container_width=True)
-
-# Tarjeta principal en una fila completa
-components.html(resumen_ventas_card_html, height=430, scrolling=False)
-
-if pd.isna(sell_through_rate):
-    sell_through_rate = 0
-
-# Por si tu columna viene en formato decimal, ejemplo: 0.35 en vez de 35
-if sell_through_rate <= 1:
-    sell_through_rate = sell_through_rate * 100
-
-ventas_unidades_totales = df_cards["Units_sold"].sum()
-ventas_monto_totales = df_cards["Sales_amount"].sum()
-registros_ventas = df_cards.shape[0]
-
+components.html(
+    side_panel_html,
+    height=270,
+    scrolling=False
+)
