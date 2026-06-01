@@ -15,7 +15,8 @@ footer {
 
 /* Un pequeño ajuste para que el contenido suba un poco y aproveche mejor el espacio */
 .block-container {
-    padding-top: 2rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0rem;
 }
 
 [data-testid="stSidebarNav"] {
@@ -115,4 +116,21 @@ section[data-testid="stSidebar"] div[data-testid="stSidebarUserContent"] {
     font-weight: 800;
     color: #dc2626;
     font-size: 16px;
+}
+/* Eliminar scroll de la página principal */
+html, body {
+    overflow: hidden !important;
+    height: 100% !important;
+}
+
+/* Reducir padding del contenedor principal para ganar espacio */
+.block-container {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0rem !important;
+    max-width: 100% !important;
+}
+
+/* Ocultar scrollbar visible pero mantener funcionalidad interna */
+.main .block-container::-webkit-scrollbar {
+    display: none;
 }
