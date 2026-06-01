@@ -16,7 +16,7 @@ st.set_page_config(
 )
 
 
-# =========================
+# =========================s
 # CSS general
 # =========================
 st.markdown(
@@ -394,7 +394,6 @@ producto_mayor_problema = (
 )
 
 valor_top5 = top5_productos["valor_inmovilizado"].sum()
-
 
 # =========================
 # Vista HTML completa
