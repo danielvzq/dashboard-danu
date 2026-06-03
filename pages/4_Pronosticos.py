@@ -86,6 +86,26 @@ def _mini_kpi(label, value):
         f'letter-spacing:-0.5px;">{value}</p></div>'
     )
 
+
+def section_title(label, subtitle="", popover_title="Ver", popover_body=""):
+    """Renders a prominent section title with an optional info popover beside it."""
+    col_t, col_p = st.columns([8, 1])
+    with col_t:
+        sub_html = (
+            f"<span style='color:#94a3b8;font-weight:400;font-size:11px;"
+            f"margin-left:10px;'>{subtitle}</span>" if subtitle else ""
+        )
+        st.markdown(
+            f"<p style='color:#0f172a;font-size:18px;font-weight:800;"
+            f"margin:0 0 4px 0;letter-spacing:-0.3px;'>"
+            f"{label}{sub_html}</p>",
+            unsafe_allow_html=True,
+        )
+    with col_p:
+        if popover_body:
+            with st.popover(popover_title, use_container_width=True):
+                st.markdown(popover_body)
+
 # COLORES Y UMBRALES
 def period_thresholds(h):
     return ((1.15)**(h/12)-1)*100, ((1.25)**(h/12)-1)*100
@@ -409,20 +429,19 @@ with tab_analisis:
         delta     = future_fc["yhat"].mean() - hist_df["y"].mean()
         sign_d    = "+" if delta >= 0 else ""
 
-        # Badges inline
-        st.markdown(
-            f"<p style='color:#0f172a;font-size:12px;font-weight:800;margin:0 0 4px 0;'>"
-            f"Demanda proyectada"
-            f"<span style='color:#94a3b8;font-weight:400;font-size:11px;margin-left:8px;'>"
-            f"{chart_label}  ·  {region_label}  ·  {horizon} meses</span>"
-            f"<span style='background:#f1f5f9;border:1px solid rgba(148,163,184,.25);"
-            f"border-radius:6px;padding:2px 8px;font-size:10px;font-weight:600;"
-            f"color:#334155;margin-left:10px;'>Forecast: {int(future_fc['yhat'].mean()):,} u/mes</span>"
-            f"<span style='background:#f1f5f9;border:1px solid rgba(148,163,184,.25);"
-            f"border-radius:6px;padding:2px 8px;font-size:10px;font-weight:600;"
-            f"color:#334155;margin-left:6px;'>Var: {sign_d}{delta:,.0f} u/mes</span>"
-            f"</p>",
-            unsafe_allow_html=True,
+        section_title(
+            "Demanda proyectada",
+            subtitle=f"{chart_label}  ·  {region_label}  ·  {horizon} meses  ·  "
+                     f"Forecast: {int(future_fc['yhat'].mean()):,} u/mes  ·  "
+                     f"Var: {sign_d}{delta:,.0f} u/mes",
+            popover_title="",
+            popover_body=(
+                "**Línea azul** — ventas históricas reales por mes  \n\n"
+                "**Línea verde punteada** — demanda proyectada por Prophet  \n\n"
+                "**Banda azul** — intervalo de confianza (rango posible de la predicción)  \n\n"
+                "Los valores de la gráfica corresponden a la serie seleccionada: "
+                "subcategoría, producto individual o región total."
+            ),
         )
 
         fig_dem = go.Figure()
@@ -445,7 +464,7 @@ with tab_analisis:
             hovertemplate="<b>%{x|%b %Y}</b><br>%{y:,.0f} u<extra></extra>",
         ))
         fig_dem.update_layout(
-            height=195, hovermode="x unified",
+            height=260, hovermode="x unified",
             plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
             font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
             margin=dict(l=40, r=20, t=5, b=25),
@@ -492,12 +511,17 @@ with tab_analisis:
     col_seas, col_reg = st.columns([1, 1], gap="large")
 
     with col_seas:
-        st.markdown(
-            f"<p style='color:#0f172a;font-size:11px;font-weight:800;margin:0 0 2px 0;'>"
-            f"Estacionalidad mensual"
-            f"<span style='color:#94a3b8;font-weight:400;font-size:10px;margin-left:6px;'>"
-            f"Pico: {peak_m}  ·  Var: {variab:.0f}%</span></p>",
-            unsafe_allow_html=True,
+        section_title(
+            "Estacionalidad mensual",
+            subtitle=f"Pico: {peak_m}  ·  Variabilidad: {variab:.0f}%",
+            popover_title="",
+            popover_body=(
+                "Promedio de ventas por mes del año, usando la misma escala que la serie temporal.  \n\n"
+                "**Verde** — mes >5% sobre el promedio (pico de demanda)  \n\n"
+                "**Rojo** — mes >5% bajo el promedio (valle de demanda)  \n\n"
+                "**Azul** — mes dentro del rango promedio  \n\n"
+                "Útil para planear reabastecimiento y campañas con anticipación."
+            ),
         )
         fig_seas = go.Figure()
         fig_seas.add_hline(y=global_avg, line=dict(color="#94a3b8",width=1,dash="dot"),
@@ -509,7 +533,7 @@ with tab_analisis:
             hovertemplate="<b>%{x}</b><br>%{y:,.0f} u<extra></extra>",
         ))
         fig_seas.update_layout(
-            height=195, plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+            height=250, plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
             font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
             margin=dict(l=10, r=20, t=5, b=25),
             xaxis=dict(showgrid=False, tickfont=dict(size=9)),
@@ -519,12 +543,17 @@ with tab_analisis:
         st.plotly_chart(fig_seas, use_container_width=True)
 
     with col_reg:
-        st.markdown(
-            "<p style='color:#0f172a;font-size:11px;font-weight:800;margin:0 0 2px 0;'>"
-            "Forecast por región"
-            "<span style='color:#94a3b8;font-weight:400;font-size:10px;margin-left:6px;'>"
-            "Prophet · sin filtros · 3m vs 6m</span></p>",
-            unsafe_allow_html=True,
+        section_title(
+            "Forecast por región",
+            subtitle="Prophet · sin filtros · 3m vs 6m",
+            popover_title="",
+            popover_body=(
+                "Demanda total proyectada por Prophet para cada región. "
+                "No se ve afectada por ningún filtro — siempre muestra el dataset completo.  \n\n"
+                "**Azul** — forecast a 3 meses  \n\n"
+                "**Verde** — forecast a 6 meses  \n\n"
+                "Ordenadas de menor a mayor demanda proyectada a 6 meses."
+            ),
         )
         fig_comp = go.Figure()
         fig_comp.add_trace(go.Bar(
@@ -538,7 +567,7 @@ with tab_analisis:
             hovertemplate="<b>%{y}</b><br>6m: %{x:,.0f} u<extra></extra>",
         ))
         fig_comp.update_layout(
-            barmode="group", height=195,
+            barmode="group", height=250,
             plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
             font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
             margin=dict(l=10, r=10, t=5, b=25),
@@ -552,22 +581,21 @@ with tab_analisis:
 with tab_redist:
 
     # ── Header con popovers y toggle interno ──────────────────────────
-    col_th, col_p1, col_p2, col_toggle = st.columns([3, 1, 1, 2])
+    col_th, col_p1, col_toggle = st.columns([3, 1, 2])
     with col_th:
         st.markdown(
-            "<p style='color:#0f172a;font-size:13px;font-weight:800;margin:4px 0 0 0;'>"
+            "<p style='color:#0f172a;font-size:18px;font-weight:800;margin:4px 0 0 0;'>"
             "Redistribución de inventario</p>",
             unsafe_allow_html=True,
         )
     with col_p1:
-        with st.popover("¿Cómo funciona?"):
+        with st.popover("¿Cómo funciona?", use_container_width=True):
             st.markdown(
                 f"Detecta el **producto más débil** por subcategoría y región y lo "
                 f"redistribuye hacia donde hay mayor demanda proyectada a **{horizon} meses**. "
                 f"Transferencias en **6 oleadas bisemanales** proporcionales a la demanda del destino."
             )
-    with col_p2:
-        with st.popover("Ver leyenda"):
+            st.markdown("---")
             st.markdown(
                 f"{dot('#ef4444')} **Rojo** — Envía stock  \n"
                 f"{dot('#22c55e')} **Verde** — Recibe stock  \n"
@@ -747,4 +775,4 @@ with tab_redist:
                 showlegend=False,
             )
             st.plotly_chart(fig_prog, use_container_width=True)
-            st.caption("🔵 Ene  🟢 Feb  🟠 Mar")
+            st.caption("Azul = Enero  ·  Verde = Febrero  ·  Naranja = Marzo")
