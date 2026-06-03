@@ -12,7 +12,7 @@ from pathlib import Path
 st.set_page_config(
     layout="wide",
     page_title="Dashboard Danu",
-    page_icon="📦"
+    page_icon="🚀"
 )
 
 
@@ -128,7 +128,7 @@ with st.sidebar:
     st.markdown(
         """
         <div class="sidebar-header">
-            <div class="sidebar-icon">📦</div>
+            <div class="sidebar-icon">🚀</div>
             <div>
                 <p class="sidebar-title">RocketData</p>
                 <p class="sidebar-subtitle">Inventory Dashboard</p>
@@ -170,19 +170,40 @@ with st.sidebar:
         ["Todas"] + categorias
     )
 
-    subcategorias = sorted(df_maestra["Subcategory"].dropna().unique().tolist())
+    # =========================
+    # Subcategoría dependiente de categoría
+    # =========================
+    df_subcategorias = df_maestra.copy()
+
+    # Respeta la región seleccionada
+    if region != "Todas":
+        df_subcategorias = df_subcategorias[
+            df_subcategorias["Region"] == region
+        ]
+
+    # Respeta la categoría seleccionada
+    if categoria != "Todas":
+        df_subcategorias = df_subcategorias[
+            df_subcategorias["Category"] == categoria
+        ]
+
+    subcategorias = sorted(
+        df_subcategorias["Subcategory"]
+        .dropna()
+        .unique()
+        .tolist()
+    )
+
     subcategoria = st.selectbox(
         "Subcategoría",
         ["Todas"] + subcategorias
     )
-
     acciones = sorted(df_maestra["Priority_action"].dropna().unique().tolist())
     acciones_seleccionadas = st.multiselect(
         "Acción prioritaria",
         acciones,
         default=acciones
     )
-
 
 # =========================
 # Aplicar filtros
@@ -261,115 +282,60 @@ def compact_metric_card(title, value, description, badge, icon, accent_color, pr
 <style>
     body {{
         margin: 0;
-        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         background: transparent;
+        font-family: Inter, system-ui, sans-serif;
     }}
 
     .metric-card {{
-        height: 132px;
-        box-sizing: border-box;
-        border-radius: 20px;
-        padding: 14px 16px;
-        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        border: 1px solid rgba(148, 163, 184, 0.22);
-        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+        position: relative;
         overflow: hidden;
+        height: 155px;
+        box-sizing: border-box;
+        border-radius: 24px;
+        padding: 26px 20px 18px 20px;
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        border: 1px solid rgba(148, 163, 184, 0.28);
     }}
 
-    .metric-top {{
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 8px;
+    .metric-card::before {{
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 7px;
+        background: var(--accent-color);
     }}
 
     .metric-title {{
         color: #0f172a;
-        font-size: 13px;
-        font-weight: 900;
-        margin: 0;
-    }}
-
-    .metric-icon {{
-        width: 30px;
-        height: 30px;
-        border-radius: 11px;
-        background: {accent_color};
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         font-size: 15px;
+        font-weight: 900;
+        margin: 0 0 14px 0;
     }}
 
     .metric-value {{
         color: #0f172a;
-        font-size: 23px;
+        font-size: 28px;
         font-weight: 950;
-        letter-spacing: -1px;
         line-height: 1;
-        margin: 0;
+        margin: 0 0 8px 0;
     }}
 
     .metric-description {{
         color: #64748b;
-        font-size: 11px;
-        font-weight: 650;
-        margin: 5px 0 8px 0;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }}
-
-    .metric-footer {{
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }}
-
-    .metric-badge {{
-        background: rgba(15, 23, 42, 0.06);
-        color: #334155;
-        font-size: 10px;
-        font-weight: 800;
-        padding: 4px 8px;
-        border-radius: 999px;
-        white-space: nowrap;
-    }}
-
-    .metric-track {{
-        flex: 1;
-        height: 6px;
-        background: #e5e7eb;
-        border-radius: 999px;
-        overflow: hidden;
-    }}
-
-    .metric-fill {{
-        height: 100%;
-        width: {progress:.1f}%;
-        background: {accent_color};
-        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 700;
+        margin: 0;
     }}
 </style>
 </head>
 
 <body>
-    <div class="metric-card">
-        <div class="metric-top">
-            <p class="metric-title">{title}</p>
-            <div class="metric-icon">{icon}</div>
-        </div>
-
-        <h1 class="metric-value">{value}</h1>
+    <div class="metric-card" style="--accent-color: {accent_color};">
+        <p class="metric-title">{title}</p>
+        <p class="metric-value">{value}</p>
         <p class="metric-description">{description}</p>
-
-        <div class="metric-footer">
-            <span class="metric-badge">{badge}</span>
-            <div class="metric-track">
-                <div class="metric-fill"></div>
-            </div>
-        </div>
     </div>
 </body>
 </html>
@@ -394,14 +360,14 @@ with col1:
     components.html(
         compact_metric_card(
             title="Overstock Crítico",
-            value=f"{productos_criticos:,} productos",
-            description=f"{unidades_excedentes:,.0f} unidades excedentes",
+            value=f"{unidades_excedentes:,.0f} unidades excedentes",
+            description=f"{productos_criticos:,} productos",
             badge="Riesgo alto",
             icon="🚨",
             accent_color="#dc2626",
             progress=progreso_overstock
         ),
-        height=145,
+        height=160,
         scrolling=False
     )
 
@@ -416,7 +382,7 @@ with col2:
             accent_color="#f59e0b",
             progress=progreso_dias
         ),
-        height=145,
+        height=160,
         scrolling=False
     )
 
@@ -431,73 +397,127 @@ with col3:
             accent_color="#2563eb",
             progress=progreso_rotacion
         ),
-        height=145,
+        height=160,
         scrolling=False
     )
 
 
 # =========================
-# Datos para gráfica
+# Card: Ventas mensuales vs stock total
 # =========================
-df_mes = df_filtrado.copy()
-df_mes["Mes"] = df_mes["Date"].dt.to_period("M").dt.to_timestamp()
+with st.container(border=True):
 
-ventas_stock_mes = (
-    df_mes
-    .groupby("Mes", as_index=False)
-    .agg({
-        "Units_sold": "sum",
-        "Stock": "sum",
-        "Sales_amount": "sum"
-    })
-    .sort_values("Mes")
-)
+    st.markdown("""
+    <div class="chart-card-header">
+        <h3>Ventas mensuales vs stock total</h3>
+        <p>
+            Las barras muestran las unidades vendidas por mes y la línea representa el stock disponible.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
-ventas_stock_mes["Mes_texto"] = ventas_stock_mes["Mes"].dt.strftime("%b %Y")
+    # =========================
+    # Datos para gráfica
+    # =========================
+    df_mes = df_filtrado.copy()
+    df_mes["Mes"] = df_mes["Date"].dt.to_period("M").dt.to_timestamp()
 
-fig = go.Figure()
-
-fig.add_trace(
-    go.Bar(
-        x=ventas_stock_mes["Mes_texto"],
-        y=ventas_stock_mes["Units_sold"],
-        name="Unidades vendidas",
-        hovertemplate="<b>%{x}</b><br>Unidades vendidas: %{y:,.0f}<extra></extra>"
+    ventas_stock_mes = (
+        df_mes
+        .groupby("Mes", as_index=False)
+        .agg({
+            "Units_sold": "sum",
+            "Stock": "sum",
+            "Sales_amount": "sum"
+        })
+        .sort_values("Mes")
     )
-)
 
-fig.add_trace(
-    go.Scatter(
-        x=ventas_stock_mes["Mes_texto"],
-        y=ventas_stock_mes["Stock"],
-        name="Stock total",
-        yaxis="y2",
-        mode="lines+markers",
-        hovertemplate="<b>%{x}</b><br>Stock total: %{y:,.0f}<extra></extra>"
+    ventas_stock_mes["Mes_texto"] = ventas_stock_mes["Mes"].dt.strftime("%b %Y")
+
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Bar(
+            x=ventas_stock_mes["Mes_texto"],
+            y=ventas_stock_mes["Units_sold"],
+            name="Unidades vendidas",
+            hovertemplate="<b>%{x}</b><br>Unidades vendidas: %{y:,.0f}<extra></extra>"
+        )
     )
-)
 
-fig.update_layout(
-    title="",
-    height=310,
-    margin=dict(l=35, r=35, t=10, b=35),
-    xaxis=dict(title=None),
-    yaxis=dict(title="Vendidas", showgrid=True),
-    yaxis2=dict(
-        title="Stock",
-        overlaying="y",
-        side="right",
-        showgrid=False
-    ),
-    legend=dict(
-        orientation="h",
-        yanchor="bottom",
-        y=1.03,
-        xanchor="right",
-        x=1
-    ),
-    hovermode="x unified"
-)
+    fig.add_trace(
+        go.Scatter(
+            x=ventas_stock_mes["Mes_texto"],
+            y=ventas_stock_mes["Stock"],
+            name="Stock total",
+            yaxis="y2",
+            mode="lines+markers",
+            hovertemplate="<b>%{x}</b><br>Stock total: %{y:,.0f}<extra></extra>"
+        )
+    )
+
+    fig.update_layout(
+        title="",
+        height=260,
+        margin=dict(l=30, r=30, t=10, b=25),
+        xaxis=dict(title=None),
+        yaxis=dict(title="Vendidas", showgrid=True),
+        yaxis2=dict(
+            title="Stock",
+            overlaying="y",
+            side="right",
+            showgrid=False
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.03,
+            xanchor="right",
+            x=1
+        ),
+        hovermode="x unified",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)"
+    )
+
+    st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config={"displayModeBar": False}
+    )
+
+st.markdown("""
+<style>
+.chart-card-header {
+    padding: 4px 8px 0 8px;
+    margin-bottom: 6px;
+}
+
+.chart-card-header h3 {
+    color: #0f172a;
+    font-size: 22px;
+    font-weight: 900;
+    margin: 0;
+    letter-spacing: -0.4px;
+}
+
+.chart-card-header p {
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 600;
+    margin: 6px 0 0 0;
+}
+
+[data-testid="stVerticalBlockBorderWrapper"] {
+    border-radius: 24px !important;
+    border: 1px solid rgba(148, 163, 184, 0.22) !important;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.035) !important;
+    padding: 0.4rem 0.6rem !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 
 # =========================
@@ -581,110 +601,119 @@ side_panel_html = f"""
 <html>
 <head>
 <style>
-    body {{
+    html, body {{
         margin: 0;
+        padding: 0;
         font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         background: transparent;
+        overflow: visible;
     }}
 
     .side-card {{
-        height: 250px;
+        height: 205px;
         box-sizing: border-box;
-        border-radius: 24px;
-        padding: 20px 22px;
+        border-radius: 22px;
+        padding: 14px 18px;
         background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
         border: 1px solid rgba(148, 163, 184, 0.22);
-        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-        overflow: hidden;
-    }}
-
-    .title {{
-        color: #0f172a;
-        font-size: 18px;
-        font-weight: 950;
-        margin: 0 0 14px 0;
+        overflow: visible;
     }}
 
     .content-grid {{
         display: grid;
-        grid-template-columns: 0.95fr 1.4fr;
-        gap: 22px;
+        grid-template-columns: 0.9fr 1.45fr;
+        gap: 18px;
         align-items: start;
+        width: 100%;
     }}
 
     .kpi-grid {{
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 14px;
-    width: 100%;
-}}
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        width: 100%;
+    }}
 
-.kpi-wide {{
-    grid-column: 1 / span 2;
-}}
+    .kpi-wide {{
+        grid-column: 1 / span 2;
+    }}
 
-.kpi {{
-    border-radius: 18px;
-    background: rgba(255, 255, 255, 0.85);
-    border: 1px solid rgba(148, 163, 184, 0.22);
-    padding: 14px 12px;
-    min-height: 74px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-}}
+    .kpi {{
+        position: relative;
+        cursor: help;
 
-.kpi-label {{
-    color: #64748b;
-    font-size: 10px;
-    font-weight: 850;
-    text-transform: uppercase;
-    margin: 0 0 8px 0;
-    white-space: nowrap;
-}}
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.85);
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        padding: 10px 10px;
+        min-height: 58px;
 
-.kpi-value {{
-    color: #0f172a;
-    font-size: 24px;
-    font-weight: 950;
-    letter-spacing: -0.8px;
-    line-height: 1;
-    margin: 0;
-}}
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+    }}
 
-.kpi-value-wide {{
-    font-size: 28px;
-}}
+    .kpi-label {{
+        color: #64748b;
+        font-size: 9px;
+        font-weight: 850;
+        text-transform: uppercase;
+        margin: 0 0 6px 0;
+        white-space: nowrap;
+        text-align: center;
+    }}
+
+    .kpi-value {{
+        color: #0f172a;
+        font-size: 21px;
+        font-weight: 950;
+        letter-spacing: -0.7px;
+        line-height: 1;
+        margin: 0;
+        text-align: center;
+    }}
+
+    .kpi-value-wide {{
+        font-size: 25px;
+    }}
+
+    .ranking-section {{
+        width: 100%;
+        min-width: 0;
+    }}
 
     .section-title {{
         color: #0f172a;
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 900;
-        margin: 0 0 10px 0;
+        margin: 0 0 8px 0;
     }}
 
     .ranking-item {{
-        margin-bottom: 8px;
+        margin-bottom: 5px;
     }}
 
     .ranking-top {{
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 4px;
+        margin-bottom: 3px;
         color: #111827;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 800;
+        line-height: 1.1;
     }}
 
     .ranking-top strong {{
         color: #dc2626;
-        font-size: 12px;
+        font-size: 11px;
     }}
 
     .bar-track {{
         width: 100%;
-        height: 7px;
+        height: 6px;
         background: #fee2e2;
         border-radius: 999px;
         overflow: hidden;
@@ -698,35 +727,96 @@ side_panel_html = f"""
 
     .footer {{
         color: #94a3b8;
+        font-size: 9px;
+        font-weight: 650;
+        margin-top: 4px;
+    }}
+
+    /* Tooltip */
+    .kpi::after {{
+        content: attr(data-tooltip);
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        width: max-content;
+        max-width: 230px;
+        background: #0f172a;
+        color: white;
         font-size: 10px;
         font-weight: 650;
-        margin-top: 6px;
+        line-height: 1.3;
+        padding: 8px 10px;
+        border-radius: 10px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease;
+        z-index: 999;
+        text-align: center;
+        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.22);
+    }}
+
+    .kpi::before {{
+        content: "";
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 6px solid transparent;
+        opacity: 0;
+        transition: opacity 0.18s ease;
+        z-index: 999;
+    }}
+
+    .tooltip-bottom::after {{
+        top: calc(100% + 8px);
+    }}
+
+    .tooltip-bottom::before {{
+        top: calc(100% - 1px);
+        border-bottom-color: #0f172a;
+    }}
+
+    .tooltip-top::after {{
+        bottom: calc(100% + 8px);
+    }}
+
+    .tooltip-top::before {{
+        bottom: calc(100% - 1px);
+        border-top-color: #0f172a;
+    }}
+
+    .kpi:hover::after,
+    .kpi:hover::before {{
+        opacity: 1;
+    }}
+
+    .kpi:hover::after {{
+        transform: translateX(-50%) translateY(-2px);
     }}
 </style>
 </head>
 
 <body>
     <div class="side-card">
-
         <div class="content-grid">
+
             <div class="kpi-grid">
-    <div class="kpi">
-        <p class="kpi-label">% ventas</p>
-        <p class="kpi-value">{porcentaje_ventas:.1f}%</p>
-    </div>
+                <div class="kpi tooltip-bottom" data-tooltip="Porcentaje de ventas realizadas respecto al total esperado o disponible en el periodo seleccionado.">
+                    <p class="kpi-label">% ventas</p>
+                    <p class="kpi-value">{porcentaje_ventas:.1f}%</p>
+                </div>
 
-    <div class="kpi">
-        <p class="kpi-label">Sell-through</p>
-        <p class="kpi-value">{sell_through_rate:.1f}%</p>
-    </div>
+                <div class="kpi tooltip-bottom" data-tooltip="Porcentaje del inventario disponible que logró venderse. Mientras más alto, mejor movimiento del stock.">
+                    <p class="kpi-label">Sell-through</p>
+                    <p class="kpi-value">{sell_through_rate:.1f}%</p>
+                </div>
 
-    <div class="kpi kpi-wide">
-        <p class="kpi-label">Ventas</p>
-        <p class="kpi-value kpi-value-wide">{ventas_unidades_totales:,.0f}</p>
-    </div>
-</div>
+                <div class="kpi kpi-wide tooltip-top" data-tooltip="Cantidad total de unidades vendidas según los filtros seleccionados.">
+                    <p class="kpi-label">Unidades vendidas</p>
+                    <p class="kpi-value kpi-value-wide">{ventas_unidades_totales:,.0f}</p>
+                </div>
+            </div>
 
-            <div>
+            <div class="ranking-section">
                 <p class="section-title">Top 5 productos con mayor sobrestock</p>
 
                 {top5_items_html}
@@ -735,18 +825,12 @@ side_panel_html = f"""
                     Medido por unidades excedentes de stock.
                 </p>
             </div>
+
         </div>
     </div>
 </body>
 </html>
 """
-
-
-st.plotly_chart(
-    fig,
-    use_container_width=True,
-    config={"displayModeBar": False}
-)
 
 components.html(
     side_panel_html,
