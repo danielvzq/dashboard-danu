@@ -16,15 +16,15 @@ st.set_page_config(
 )
 
 
-# =========================s
-# CSS general
+# =========================
+# CSS general compacto
 # =========================
 st.markdown(
     """
     <style>
         .block-container {
-            padding-top: 2rem !important;
-            padding-bottom: 0.5rem !important;
+            padding-top: 2.2rem !important;
+            padding-bottom: 0.8rem !important;
             padding-left: 1.4rem !important;
             padding-right: 1.4rem !important;
             max-width: 100% !important;
@@ -32,38 +32,33 @@ st.markdown(
 
         h1, h2, h3 {
             margin-top: 0 !important;
-            margin-bottom: 0.5rem !important;
+            margin-bottom: 0.6rem !important;
+        }
+
+        .main-title {
+            color: white;
+            font-size: 30px;
+            font-weight: 950;
+            letter-spacing: -0.8px;
+            margin: 0 0 16px 0;
+            line-height: 1.2;
         }
 
         div[data-testid="stVerticalBlock"] {
-            gap: 0.5rem !important;
+            gap: 0.65rem !important;
+        }
+
+        div[data-testid="stHorizontalBlock"] {
+            gap: 0.8rem !important;
         }
 
         iframe {
             display: block;
         }
-
-        .main-title {
-            color: white;
-            font-size: 34px;
-            font-weight: 950;
-            letter-spacing: -1px;
-            margin: 0 0 14px 0;
-            line-height: 1.1;
-        }
-
-        .main-subtitle {
-            color: #94a3b8;
-            font-size: 15px;
-            font-weight: 600;
-            margin-top: -6px;
-            margin-bottom: 14px;
-        }
     </style>
     """,
     unsafe_allow_html=True
 )
-
 
 # =========================
 # Cargar CSS personalizado
@@ -144,13 +139,13 @@ df_maestra = cargar_datos()
 
 
 # =========================
-# Sidebar
+# Sidebar - Filtros
 # =========================
 with st.sidebar:
     st.markdown(
         """
         <div class="sidebar-header">
-            <div class="sidebar-icon">📦</div>
+            <div class="sidebar-icon">🚀</div>
             <div>
                 <p class="sidebar-title">RocketData</p>
                 <p class="sidebar-subtitle">Inventory Dashboard</p>
@@ -181,13 +176,61 @@ with st.sidebar:
     )
 
     regiones = sorted(df_maestra["Region"].dropna().unique().tolist())
-    region = st.selectbox("Región", ["Todas"] + regiones)
+    region = st.selectbox(
+        "Región",
+        ["Todas"] + regiones
+    )
 
     categorias = sorted(df_maestra["Category"].dropna().unique().tolist())
-    categoria = st.selectbox("Categoría", ["Todas"] + categorias)
+    categoria = st.selectbox(
+        "Categoría",
+        ["Todas"] + categorias
+    )
 
-    subcategorias = sorted(df_maestra["Subcategory"].dropna().unique().tolist())
-    subcategoria = st.selectbox("Subcategoría", ["Todas"] + subcategorias)
+    # =========================
+    # Subcategoría dependiente de filtros previos
+    # =========================
+    df_subcategorias = df_maestra.copy()
+
+    if isinstance(rango_fechas, tuple) and len(rango_fechas) == 2:
+        fecha_inicio, fecha_fin = rango_fechas
+
+        df_subcategorias = df_subcategorias[
+            (df_subcategorias["Date"].dt.date >= fecha_inicio) &
+            (df_subcategorias["Date"].dt.date <= fecha_fin)
+        ]
+
+    if region != "Todas":
+        df_subcategorias = df_subcategorias[
+            df_subcategorias["Region"] == region
+        ]
+
+    if categoria != "Todas":
+        df_subcategorias = df_subcategorias[
+            df_subcategorias["Category"] == categoria
+        ]
+
+    subcategorias = sorted(
+        df_subcategorias["Subcategory"]
+        .dropna()
+        .unique()
+        .tolist()
+    )
+
+    subcategoria = st.selectbox(
+        "Subcategoría",
+        ["Todas"] + subcategorias
+    )
+
+    if "Priority_action" in df_maestra.columns:
+        acciones = sorted(df_maestra["Priority_action"].dropna().unique().tolist())
+        acciones_seleccionadas = st.multiselect(
+            "Acción prioritaria",
+            acciones,
+            default=acciones
+        )
+    else:
+        acciones_seleccionadas = []
 
 
 # =========================
@@ -211,6 +254,9 @@ if categoria != "Todas":
 
 if subcategoria != "Todas":
     df = df[df["Subcategory"] == subcategoria]
+
+if acciones_seleccionadas and "Priority_action" in df.columns:
+    df = df[df["Priority_action"].isin(acciones_seleccionadas)]
 
 
 # =========================
@@ -321,10 +367,11 @@ stock_muerto_df = producto_resumen[
     (producto_resumen["stock_total"] > 0)
 ].copy()
 
-# Movimiento mínimo: vendieron algo, pero sell-through menor a 1%
+# Movimiento mínimo: vendieron algo, pero sell-through entre 1% y 5%
 mov_minimo_df = producto_resumen[
     (producto_resumen["unidades_vendidas"] > 0) &
-    (producto_resumen["sell_through_estimado"] < 1) &
+    (producto_resumen["sell_through_estimado"] >= 1) &
+    (producto_resumen["sell_through_estimado"] <= 5) &
     (producto_resumen["stock_total"] > 0)
 ].copy()
 
@@ -421,121 +468,127 @@ dashboard_html = f"""
 <html>
 <head>
 <style>
-    body {{
+    html, body {{
         margin: 0;
+        padding: 0;
         background: transparent;
         font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        overflow: hidden;
     }}
 
     .view {{
-        height: 670px;
+        height: 600px;
         box-sizing: border-box;
         overflow: hidden;
     }}
 
     .kpi-grid {{
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 14px;
-        margin-bottom: 14px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 10px;
     }}
 
     .kpi-card {{
+        position: relative;
         background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
         border: 1px solid rgba(148, 163, 184, 0.22);
-        border-radius: 24px;
-        padding: 18px 20px;
-        height: 130px;
+        border-radius: 22px;
+        padding: 22px 18px 14px 18px;
+        height: 118px;
         box-sizing: border-box;
-        box-shadow: 0 14px 32px rgba(15, 23, 42, 0.10);
+        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.025);
         overflow: hidden;
     }}
 
+    .kpi-card::before {{
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 6px;
+        background: #2563eb;
+    }}
+
+    .kpi-grid .kpi-card:nth-child(1)::before {{ background: #7c3aed; }}
+    .kpi-grid .kpi-card:nth-child(2)::before {{ background: #dc2626; }}
+    .kpi-grid .kpi-card:nth-child(3)::before {{ background: #f59e0b; }}
+    .kpi-grid .kpi-card:nth-child(4)::before {{ background: #2563eb; }}
+
     .kpi-top {{
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 13px;
+        display: block;
+        margin-bottom: 10px;
     }}
 
     .kpi-label {{
         color: #0f172a;
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 950;
         margin: 0;
+        line-height: 1.1;
     }}
 
     .kpi-icon {{
-        width: 34px;
-        height: 34px;
-        border-radius: 13px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-size: 17px;
-        font-weight: 900;
+        display: none;
     }}
-
-    .red {{ background: #dc2626; }}
-    .orange {{ background: #f59e0b; }}
-    .blue {{ background: #2563eb; }}
-    .purple {{ background: #7c3aed; }}
 
     .kpi-value {{
         color: #0f172a;
-        font-size: 27px;
+        font-size: 28px;
         font-weight: 950;
         line-height: 1;
         letter-spacing: -1px;
-        margin: 0;
+        margin: 0 0 7px 0;
     }}
 
     .kpi-desc {{
         color: #64748b;
         font-size: 12px;
         font-weight: 700;
-        margin: 7px 0 0 0;
-        white-space: nowrap;
+        margin: 0;
+        line-height: 1.25;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
         overflow: hidden;
-        text-overflow: ellipsis;
     }}
 
     .main-grid {{
         display: grid;
-        grid-template-columns: 1.25fr 0.95fr;
-        gap: 14px;
-        height: 365px;
-        margin-bottom: 14px;
+        grid-template-columns: 1.2fr 0.95fr;
+        gap: 10px;
+        height: 305px;
+        margin-bottom: 10px;
     }}
 
     .panel {{
         background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
         border: 1px solid rgba(148, 163, 184, 0.22);
-        border-radius: 28px;
-        padding: 22px 24px;
+        border-radius: 22px;
+        padding: 16px 18px;
         box-sizing: border-box;
-        box-shadow: 0 14px 32px rgba(15, 23, 42, 0.10);
+        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.025);
         overflow: hidden;
     }}
 
     .panel-title {{
         color: #0f172a;
-        font-size: 19px;
+        font-size: 16px;
         font-weight: 950;
         margin: 0 0 4px 0;
-        letter-spacing: -0.3px;
+        letter-spacing: -0.25px;
     }}
 
     .panel-subtitle {{
         color: #64748b;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 700;
-        margin: 0 0 15px 0;
+        margin: 0 0 10px 0;
     }}
 
     .product-row {{
-        margin-bottom: 13px;
+        margin-bottom: 8px;
     }}
 
     .product-top {{
@@ -543,14 +596,14 @@ dashboard_html = f"""
         justify-content: space-between;
         align-items: center;
         gap: 12px;
-        margin-bottom: 6px;
+        margin-bottom: 4px;
     }}
 
     .product-name {{
         color: #111827;
-        font-size: 14px;
+        font-size: 12px;
         font-weight: 900;
-        max-width: 78%;
+        max-width: 76%;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -558,14 +611,14 @@ dashboard_html = f"""
 
     .product-value {{
         color: #dc2626;
-        font-size: 14px;
+        font-size: 12px;
         font-weight: 950;
         white-space: nowrap;
     }}
 
     .bar-track {{
         width: 100%;
-        height: 8px;
+        height: 6px;
         background: #fee2e2;
         border-radius: 999px;
         overflow: hidden;
@@ -580,38 +633,39 @@ dashboard_html = f"""
     .product-bottom {{
         display: flex;
         justify-content: space-between;
+        gap: 10px;
         color: #94a3b8;
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 750;
-        margin-top: 5px;
+        margin-top: 4px;
     }}
 
     .dead-summary {{
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
-        margin-bottom: 14px;
+        gap: 8px;
+        margin-bottom: 8px;
     }}
 
     .dead-mini {{
-        background: rgba(255, 255, 255, 0.82);
+        background: rgba(255, 255, 255, 0.85);
         border: 1px solid rgba(148, 163, 184, 0.22);
-        border-radius: 18px;
-        padding: 14px;
+        border-radius: 16px;
+        padding: 10px 12px;
         box-sizing: border-box;
     }}
 
     .dead-mini-label {{
         color: #64748b;
-        font-size: 10px;
+        font-size: 9px;
         font-weight: 900;
         text-transform: uppercase;
-        margin: 0 0 7px 0;
+        margin: 0 0 6px 0;
     }}
 
     .dead-mini-value {{
         color: #0f172a;
-        font-size: 24px;
+        font-size: 22px;
         font-weight: 950;
         margin: 0;
         line-height: 1;
@@ -622,16 +676,16 @@ dashboard_html = f"""
         grid-template-columns: 1fr auto;
         gap: 10px;
         align-items: center;
-        padding: 10px 0;
-        border-bottom: 1px solid rgba(148, 163, 184, 0.20);
+        padding: 7px 0;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.18);
     }}
 
     .dead-name {{
         color: #111827;
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 900;
         margin: 0;
-        max-width: 330px;
+        max-width: 310px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -639,65 +693,68 @@ dashboard_html = f"""
 
     .dead-meta {{
         color: #64748b;
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 700;
-        margin: 4px 0 0 0;
+        margin: 3px 0 0 0;
     }}
 
     .dead-value {{
         color: #dc2626;
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 950;
         white-space: nowrap;
     }}
 
     .empty-state {{
         color: #64748b;
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 700;
         background: rgba(241, 245, 249, 0.9);
         border-radius: 16px;
-        padding: 16px;
+        padding: 14px;
     }}
 
     .insight-grid {{
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 14px;
-        height: 145px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        height: 132px;
     }}
 
     .insight {{
         background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
         border: 1px solid rgba(148, 163, 184, 0.22);
-        border-radius: 24px;
-        padding: 18px 20px;
+        border-radius: 22px;
+        padding: 15px 18px;
         box-sizing: border-box;
-        box-shadow: 0 14px 32px rgba(15, 23, 42, 0.10);
+        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.025);
         overflow: hidden;
     }}
 
     .insight-label {{
         color: #64748b;
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 950;
         text-transform: uppercase;
-        margin: 0 0 8px 0;
+        margin: 0 0 7px 0;
     }}
 
     .insight-title {{
         color: #0f172a;
-        font-size: 16px;
+        font-size: 15px;
         font-weight: 950;
-        margin: 0 0 6px 0;
+        margin: 0 0 5px 0;
         line-height: 1.15;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }}
 
     .insight-text {{
         color: #64748b;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 700;
-        line-height: 1.35;
+        line-height: 1.3;
         margin: 0;
     }}
 </style>
@@ -747,14 +804,13 @@ dashboard_html = f"""
         <div class="main-grid">
             <div class="panel">
                 <p class="panel-title">Productos que concentran el problema</p>
-                <p class="panel-subtitle">Top 5 productos responsables de la mayor parte del sobrestock</p>
 
                 {top5_html}
             </div>
 
             <div class="panel">
                 <p class="panel-title">Stock muerto y movimiento mínimo</p>
-                <p class="panel-subtitle">Productos con ventas nulas o sell-through menor a 1%</p>
+                <p class="panel-subtitle">Productos sin ventas o con sell-through entre 1% y 5%</p>
 
                 <div class="dead-summary">
                     <div class="dead-mini">
@@ -812,13 +868,8 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.markdown(
-    '<p class="main-subtitle">Vista ejecutiva para identificar productos críticos, stock muerto y dinero inmovilizado.</p>',
-    unsafe_allow_html=True
-)
-
 components.html(
     dashboard_html,
-    height=690,
+    height=610,
     scrolling=False
 )
