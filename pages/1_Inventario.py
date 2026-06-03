@@ -469,6 +469,8 @@ dashboard_html = f"""
 <head>
 <style>
     html, body {{
+        width: 100%;
+        height: 100%;
         margin: 0;
         padding: 0;
         background: transparent;
@@ -476,17 +478,27 @@ dashboard_html = f"""
         overflow: hidden;
     }}
 
-    .view {{
-        height: 600px;
+    * {{
         box-sizing: border-box;
+    }}
+
+    .view {{
+        width: 100%;
+        height: 100vh;
+        min-height: 100vh;
         overflow: hidden;
+        display: grid;
+        grid-template-rows: minmax(112px, 0.95fr) minmax(0, 2.7fr) minmax(112px, 0.95fr);
+        gap: clamp(8px, 1.15vh, 14px);
     }}
 
     .kpi-grid {{
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 10px;
-        margin-bottom: 10px;
+        min-height: 0;
+        height: 100%;
+        margin: 0;
     }}
 
     .kpi-card {{
@@ -494,11 +506,14 @@ dashboard_html = f"""
         background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
         border: 1px solid rgba(148, 163, 184, 0.22);
         border-radius: 22px;
-        padding: 22px 18px 14px 18px;
-        height: 118px;
-        box-sizing: border-box;
+        padding: clamp(14px, 2vh, 20px) 18px 12px 18px;
+        height: 100%;
+        min-height: 0;
         box-shadow: 0 6px 18px rgba(15, 23, 42, 0.025);
         overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }}
 
     .kpi-card::before {{
@@ -518,12 +533,12 @@ dashboard_html = f"""
 
     .kpi-top {{
         display: block;
-        margin-bottom: 10px;
+        margin-bottom: clamp(5px, 1vh, 9px);
     }}
 
     .kpi-label {{
         color: #0f172a;
-        font-size: 14px;
+        font-size: clamp(12px, 1.1vw, 14px);
         font-weight: 950;
         margin: 0;
         line-height: 1.1;
@@ -535,16 +550,19 @@ dashboard_html = f"""
 
     .kpi-value {{
         color: #0f172a;
-        font-size: 28px;
+        font-size: clamp(26px, 2.6vw, 38px);
         font-weight: 950;
         line-height: 1;
         letter-spacing: -1px;
-        margin: 0 0 7px 0;
+        margin: 0 0 6px 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }}
 
     .kpi-desc {{
         color: #64748b;
-        font-size: 12px;
+        font-size: clamp(10px, 0.9vw, 12px);
         font-weight: 700;
         margin: 0;
         line-height: 1.25;
@@ -556,25 +574,37 @@ dashboard_html = f"""
 
     .main-grid {{
         display: grid;
-        grid-template-columns: 1.2fr 0.95fr;
+        grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.95fr);
         gap: 10px;
-        height: 305px;
-        margin-bottom: 10px;
+        min-height: 0;
+        height: 100%;
+        margin: 0;
     }}
 
     .panel {{
         background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
         border: 1px solid rgba(148, 163, 184, 0.22);
         border-radius: 22px;
-        padding: 16px 18px;
-        box-sizing: border-box;
+        padding: clamp(12px, 1.7vh, 16px) 18px;
+        height: 100%;
+        min-height: 0;
         box-shadow: 0 6px 18px rgba(15, 23, 42, 0.025);
         overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }}
+
+    .product-list {{
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-rows: repeat(5, minmax(0, 1fr));
+        gap: clamp(8px, 1.35vh, 16px);
     }}
 
     .panel-title {{
         color: #0f172a;
-        font-size: 16px;
+        font-size: clamp(14px, 1.2vw, 16px);
         font-weight: 950;
         margin: 0 0 4px 0;
         letter-spacing: -0.25px;
@@ -584,11 +614,15 @@ dashboard_html = f"""
         color: #64748b;
         font-size: 11px;
         font-weight: 700;
-        margin: 0 0 10px 0;
+        margin: 0 0 8px 0;
     }}
 
     .product-row {{
-        margin-bottom: 8px;
+        margin: 0;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }}
 
     .product-top {{
@@ -601,7 +635,7 @@ dashboard_html = f"""
 
     .product-name {{
         color: #111827;
-        font-size: 12px;
+        font-size: clamp(12px, 1vw, 15px);
         font-weight: 900;
         max-width: 76%;
         white-space: nowrap;
@@ -611,14 +645,14 @@ dashboard_html = f"""
 
     .product-value {{
         color: #dc2626;
-        font-size: 12px;
+        font-size: clamp(12px, 1vw, 15px);
         font-weight: 950;
         white-space: nowrap;
     }}
 
     .bar-track {{
         width: 100%;
-        height: 6px;
+        height: clamp(6px, 0.9vh, 10px);
         background: #fee2e2;
         border-radius: 999px;
         overflow: hidden;
@@ -635,7 +669,7 @@ dashboard_html = f"""
         justify-content: space-between;
         gap: 10px;
         color: #94a3b8;
-        font-size: 10px;
+        font-size: clamp(10px, 0.85vw, 12px);
         font-weight: 750;
         margin-top: 4px;
     }}
@@ -647,12 +681,18 @@ dashboard_html = f"""
         margin-bottom: 8px;
     }}
 
+    .dead-list {{
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+    }}
+
     .dead-mini {{
         background: rgba(255, 255, 255, 0.85);
         border: 1px solid rgba(148, 163, 184, 0.22);
         border-radius: 16px;
-        padding: 10px 12px;
-        box-sizing: border-box;
+        padding: clamp(8px, 1.4vh, 10px) 12px;
     }}
 
     .dead-mini-label {{
@@ -660,12 +700,12 @@ dashboard_html = f"""
         font-size: 9px;
         font-weight: 900;
         text-transform: uppercase;
-        margin: 0 0 6px 0;
+        margin: 0 0 5px 0;
     }}
 
     .dead-mini-value {{
         color: #0f172a;
-        font-size: 22px;
+        font-size: clamp(18px, 1.8vw, 22px);
         font-weight: 950;
         margin: 0;
         line-height: 1;
@@ -673,19 +713,19 @@ dashboard_html = f"""
 
     .dead-row {{
         display: grid;
-        grid-template-columns: 1fr auto;
+        grid-template-columns: minmax(0, 1fr) auto;
         gap: 10px;
         align-items: center;
-        padding: 7px 0;
+        padding: clamp(5px, 0.8vh, 7px) 0;
         border-bottom: 1px solid rgba(148, 163, 184, 0.18);
     }}
 
     .dead-name {{
         color: #111827;
-        font-size: 12px;
+        font-size: clamp(10px, 0.9vw, 12px);
         font-weight: 900;
         margin: 0;
-        max-width: 310px;
+        max-width: 100%;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -693,55 +733,66 @@ dashboard_html = f"""
 
     .dead-meta {{
         color: #64748b;
-        font-size: 10px;
+        font-size: clamp(9px, 0.75vw, 10px);
         font-weight: 700;
         margin: 3px 0 0 0;
     }}
 
     .dead-value {{
         color: #dc2626;
-        font-size: 12px;
+        font-size: clamp(10px, 0.9vw, 12px);
         font-weight: 950;
         white-space: nowrap;
     }}
 
     .empty-state {{
         color: #64748b;
-        font-size: 12px;
+        font-size: clamp(12px, 1vw, 15px);
         font-weight: 700;
         background: rgba(241, 245, 249, 0.9);
         border-radius: 16px;
         padding: 14px;
+        min-height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
     }}
 
     .insight-grid {{
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 10px;
-        height: 132px;
+        min-height: 0;
+        height: 100%;
+        margin: 0;
     }}
 
     .insight {{
         background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
         border: 1px solid rgba(148, 163, 184, 0.22);
         border-radius: 22px;
-        padding: 15px 18px;
-        box-sizing: border-box;
+        padding: clamp(12px, 1.7vh, 15px) 18px;
+        height: 100%;
+        min-height: 0;
         box-shadow: 0 6px 18px rgba(15, 23, 42, 0.025);
         overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }}
 
     .insight-label {{
         color: #64748b;
-        font-size: 10px;
+        font-size: clamp(9px, 0.8vw, 10px);
         font-weight: 950;
         text-transform: uppercase;
-        margin: 0 0 7px 0;
+        margin: 0 0 6px 0;
     }}
 
     .insight-title {{
         color: #0f172a;
-        font-size: 15px;
+        font-size: clamp(13px, 1.2vw, 15px);
         font-weight: 950;
         margin: 0 0 5px 0;
         line-height: 1.15;
@@ -752,10 +803,35 @@ dashboard_html = f"""
 
     .insight-text {{
         color: #64748b;
-        font-size: 11px;
+        font-size: clamp(10px, 0.9vw, 11px);
         font-weight: 700;
         line-height: 1.3;
         margin: 0;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }}
+
+    @media (max-height: 720px) {{
+        .view {{
+            grid-template-rows: minmax(84px, 0.85fr) minmax(0, 2.7fr) minmax(92px, 0.85fr);
+            gap: 8px;
+        }}
+
+        .kpi-card,
+        .panel,
+        .insight {{
+            border-radius: 18px;
+        }}
+
+        .product-list {{
+            gap: 5px;
+        }}
+
+        .bar-track {{
+            height: 5px;
+        }}
     }}
 </style>
 </head>
@@ -802,13 +878,15 @@ dashboard_html = f"""
         </div>
 
         <div class="main-grid">
-            <div class="panel">
+            <div class="panel products-panel">
                 <p class="panel-title">Productos que concentran el problema</p>
 
-                {top5_html}
+                <div class="product-list">
+                    {top5_html}
+                </div>
             </div>
 
-            <div class="panel">
+            <div class="panel stock-panel">
                 <p class="panel-title">Stock muerto y movimiento mínimo</p>
                 <p class="panel-subtitle">Productos sin ventas o con sell-through entre 1% y 5%</p>
 
@@ -824,7 +902,9 @@ dashboard_html = f"""
                     </div>
                 </div>
 
-                {stock_muerto_html}
+                <div class="dead-list">
+                    {stock_muerto_html}
+                </div>
             </div>
         </div>
 
@@ -858,8 +938,6 @@ dashboard_html = f"""
 </body>
 </html>
 """
-
-
 # =========================
 # Render
 # =========================
@@ -870,6 +948,6 @@ st.markdown(
 
 components.html(
     dashboard_html,
-    height=610,
+    height=750,
     scrolling=False
 )

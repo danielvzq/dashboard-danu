@@ -1,255 +1,592 @@
 import streamlit as st
+import streamlit.components.v1 as components
+from html import escape
+from pathlib import Path
+
 import pandas as pd
 import plotly.express as px
 
-st.set_page_config(page_title="Centro de Ventas", layout="wide", initial_sidebar_state="expanded")
 
-# ==========================================
-# ESTILOS CSS
-# ==========================================
-st.markdown("""
+# =========================
+# Configuración de página
+# =========================
+st.set_page_config(
+    page_title="Centro de Ventas",
+    page_icon="🚀",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+
+# =========================
+# CSS general - estilo Inicio
+# =========================
+st.markdown(
+    """
     <style>
-    .block-container { padding-top: 1.5rem; padding-bottom: 1.5rem; width: 100%; max-width: 100%; }
-    h1, h2, h3 { font-weight: 700 !important; color: #1e293b; }
+        .block-container {
+            padding-top: 2.2rem !important;
+            padding-bottom: 0.8rem !important;
+            padding-left: 1.4rem !important;
+            padding-right: 1.4rem !important;
+            max-width: 100% !important;
+        }
 
-    /* ---- Hero fluido y responsivo ---- */
-    .hero-section {
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 60%, #1e3a8a 100%);
-        border-radius: 16px;
-        min-height: 220px;
-        padding: 2rem 1rem;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        margin-bottom: 2rem;
+        h1, h2, h3 {
+            margin-top: 0 !important;
+            margin-bottom: 0.6rem !important;
+        }
+
+        .main-title {
+            color: #0f172a;
+            font-size: 30px;
+            font-weight: 950;
+            letter-spacing: -0.8px;
+            margin: 0 0 16px 0;
+            line-height: 1.2;
+        }
+
+        div[data-testid="stVerticalBlock"] {
+            gap: 0.65rem !important;
+        }
+
+        div[data-testid="stHorizontalBlock"] {
+            gap: 0.8rem !important;
+        }
+
+        iframe {
+            display: block;
+        }
+
+        .chart-card-header {
+            padding: 4px 8px 0 8px;
+            margin-bottom: 6px;
+        }
+
+        .chart-card-header h3 {
+            color: #0f172a;
+            font-size: 22px;
+            font-weight: 900;
+            margin: 0;
+            letter-spacing: -0.4px;
+        }
+
+        .chart-card-header p {
+            color: #64748b;
+            font-size: 14px;
+            font-weight: 600;
+            margin: 6px 0 0 0;
+        }
+
+        [data-testid="stVerticalBlockBorderWrapper"] {
+            border-radius: 24px !important;
+            border: 1px solid rgba(148, 163, 184, 0.22) !important;
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.035) !important;
+            padding: 0.4rem 0.6rem !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# =========================
+# Cargar CSS personalizado
+# =========================
+css_path = Path("styles/main.css")
+
+if css_path.exists():
+    with open(css_path, encoding="utf-8") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+
+# =========================
+# Funciones auxiliares
+# =========================
+def safe_sum(series):
+    return pd.to_numeric(series, errors="coerce").fillna(0).sum()
+
+
+def compact_metric_card(title, value, description, accent_color):
+    title = escape(str(title))
+    value = escape(str(value))
+    description = escape(str(description))
+
+    return f"""
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+    html, body {{
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }}
+
+    .metric-card {{
         position: relative;
         overflow: hidden;
+        height: 155px;
+        box-sizing: border-box;
+        border-radius: 24px;
+        padding: 26px 20px 18px 20px;
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        border: 1px solid rgba(148, 163, 184, 0.28);
+    }}
+
+    .metric-card::before {{
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
         width: 100%;
-    }
-    .hero-section::before {
-        content: ''; position: absolute; top: -60px; right: -60px; width: 240px; height: 240px;
-        background: radial-gradient(circle, rgba(37,99,235,0.35) 0%, transparent 70%); border-radius: 50%;
-    }
-    .hero-section::after {
-        content: ''; position: absolute; bottom: -40px; left: -40px; width: 180px; height: 180px;
-        background: radial-gradient(circle, rgba(16,185,129,0.20) 0%, transparent 70%); border-radius: 50%;
-    }
-    .hero-title {
-        font-size: clamp(1.8rem, 4vw, 2.4rem) !important;
-        font-weight: 800 !important; color: #ffffff !important; margin: 0 0 12px 0 !important; line-height: 1.2; z-index: 1; text-align: center !important;
-    }
-    .hero-subtitle {
-        font-size: clamp(0.9rem, 2vw, 1.05rem); color: #94a3b8; max-width: 650px; line-height: 1.5; z-index: 1; text-align: center;
-    }
-    .hero-divider {
-        width: 60px; height: 3px; background: linear-gradient(90deg, #2563eb, #10b981); border-radius: 2px; margin-top: 18px; z-index: 1;
-    }
+        height: 7px;
+        background: var(--accent-color);
+    }}
 
-    /* ---- Títulos de Sección (Blue Theme) ---- */
-    .section-title {
-        color: #1e3a8a !important;
-        border-left: 4px solid #2563eb;
-        padding-left: 14px;
-        font-size: clamp(1.1rem, 2.5vw, 1.25rem) !important;
-        font-weight: 800 !important;
-        margin-top: 1.5rem !important;
-        margin-bottom: 1.2rem !important;
-        background: linear-gradient(90deg, #eff6ff 0%, transparent 100%);
-        padding-top: 8px;
-        padding-bottom: 8px;
-        border-radius: 0 8px 8px 0;
-    }
-    </style>
-""", unsafe_allow_html=True)
+    .metric-title {{
+        color: #0f172a;
+        font-size: 15px;
+        font-weight: 900;
+        margin: 0 0 14px 0;
+    }}
 
-# ==========================================
-# CARGA Y PREPARACIÓN DE DATOS
-# ==========================================
+    .metric-value {{
+        color: #0f172a;
+        font-size: 28px;
+        font-weight: 950;
+        letter-spacing: -0.8px;
+        line-height: 1;
+        margin: 0 0 8px 0;
+    }}
+
+    .metric-description {{
+        color: #64748b;
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.25;
+        margin: 0;
+    }}
+</style>
+</head>
+<body>
+    <div class="metric-card" style="--accent-color: {accent_color};">
+        <p class="metric-title">{title}</p>
+        <p class="metric-value">{value}</p>
+        <p class="metric-description">{description}</p>
+    </div>
+</body>
+</html>
+"""
+
+
+def chart_header(title, description):
+    return f"""
+    <div class="chart-card-header">
+        <h3>{escape(title)}</h3>
+        <p>{escape(description)}</p>
+    </div>
+    """
+
+
+# =========================
+# Carga y preparación de datos
+# =========================
 @st.cache_data
 def cargar_datos():
     df_maestra = pd.read_csv("data/df_Maestra.csv")
-    df_maestra["Date"] = pd.to_datetime(df_maestra["Date"])
-    df_maestra["Exceso_Porcentual"] = df_maestra["Percentage"] - 100.0
-    
-    # Redondear montos a enteros para eliminar puntos decimales en las gráficas
-    df_maestra["Sales_amount"] = df_maestra["Sales_amount"].fillna(0).round(0).astype(int)
-    
-    df_maestra["Region"] = df_maestra["Region"].astype(str).str.strip().str.title()
-    df_maestra["Category"] = df_maestra["Category"].astype(str).str.strip().str.title()
-    df_maestra["Subcategory"] = df_maestra["Subcategory"].astype(str).str.strip().str.title()
+    df_maestra.columns = df_maestra.columns.str.strip()
+    df_maestra["Date"] = pd.to_datetime(df_maestra["Date"], errors="coerce")
+
+    if "Percentage" in df_maestra.columns:
+        df_maestra["Exceso_Porcentual"] = df_maestra["Percentage"] - 100.0
+
+    df_maestra["Sales_amount"] = (
+        pd.to_numeric(df_maestra["Sales_amount"], errors="coerce")
+        .fillna(0)
+        .round(0)
+        .astype(int)
+    )
+
+    for col in ["Region", "Category", "Subcategory"]:
+        if col in df_maestra.columns:
+            df_maestra[col] = df_maestra[col].astype(str).str.strip().str.title()
 
     df_ventas = pd.read_csv("data/ventas_limpio.csv")
     df_clientes = pd.read_csv("data/clientes_limpio.csv")
     df_productos = pd.read_csv("data/productos_limpio.csv")
 
-    df_clientes['Segmento_Cliente'] = pd.qcut(
-        df_clientes['Average_Ticket'], 
-        q=3, 
-        labels=['Ticket Bajo', 'Ticket Medio', 'Ticket Alto']
+    for dataframe in [df_ventas, df_clientes, df_productos]:
+        dataframe.columns = dataframe.columns.str.strip()
+
+    if "Date" in df_ventas.columns:
+        df_ventas["Date"] = pd.to_datetime(df_ventas["Date"], errors="coerce")
+
+    df_clientes["Segmento_Cliente"] = pd.qcut(
+        df_clientes["Average_Ticket"],
+        q=3,
+        labels=["Ticket Bajo", "Ticket Medio", "Ticket Alto"],
+        duplicates="drop"
     )
 
-    df_cv = pd.merge(df_ventas, df_clientes, left_on='Client_id', right_on='Client_ID', how='inner')
-    df_cv = pd.merge(df_cv, df_productos, on='Product_id', how='left')
-    
-    # Redondear montos a enteros en la base transaccional
-    df_cv["Sales_amount"] = df_cv["Sales_amount"].fillna(0).round(0).astype(int)
-    
-    df_cv["Region"] = df_cv["Region"].astype(str).str.strip().str.title()
-    df_cv["Category"] = df_cv["Category"].astype(str).str.strip().str.title()
+    df_cv = pd.merge(
+        df_ventas,
+        df_clientes,
+        left_on="Client_id",
+        right_on="Client_ID",
+        how="inner"
+    )
+    df_cv = pd.merge(df_cv, df_productos, on="Product_id", how="left")
+
+    if "Sales_amount" in df_cv.columns:
+        df_cv["Sales_amount"] = (
+            pd.to_numeric(df_cv["Sales_amount"], errors="coerce")
+            .fillna(0)
+            .round(0)
+            .astype(int)
+        )
+
+    for col in ["Region", "Category", "Subcategory"]:
+        if col in df_cv.columns:
+            df_cv[col] = df_cv[col].astype(str).str.strip().str.title()
 
     return df_maestra, df_cv
 
+
 try:
     df_base, df_cv = cargar_datos()
-except FileNotFoundError as e:
-    st.error("Error al cargar los archivos CSV. Asegúrate de que 'df_Maestra.csv', 'ventas_limpio.csv', 'clientes_limpio.csv' y 'productos_limpio.csv' estén dentro de la carpeta 'data/'.")
+except FileNotFoundError:
+    st.error(
+        "Error al cargar los archivos CSV. Asegúrate de que 'df_Maestra.csv', "
+        "'ventas_limpio.csv', 'clientes_limpio.csv' y 'productos_limpio.csv' estén dentro de la carpeta 'data/'."
+    )
     st.stop()
 
-# --- SIDEBAR ---
+
+# =========================
+# Sidebar - Filtros
+# =========================
 with st.sidebar:
-    st.markdown("### Filtros de Análisis")
-    
-    region_options = ["Todas las Regiones"] + sorted(df_base["Region"].unique().tolist())
-    region_sel = st.selectbox("Región", region_options)
-    
-    cat_options = ["Todas las Categorías"] + sorted(df_base["Category"].unique().tolist())
-    categoria_sel = st.selectbox("Categoría", cat_options)
-    
-    df_filtrado_maestra = df_base.copy()
-    df_filtrado_cv = df_cv.copy()
+    st.markdown(
+        """
+        <div class="sidebar-header">
+            <div class="sidebar-icon">🚀</div>
+            <div>
+                <p class="sidebar-title">RocketData</p>
+                <p class="sidebar-subtitle">Inventory Dashboard</p>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-    if region_sel != "Todas las Regiones":
-        df_filtrado_maestra = df_filtrado_maestra[df_filtrado_maestra["Region"] == region_sel]
-        df_filtrado_cv = df_filtrado_cv[df_filtrado_cv["Region"] == region_sel]
-
-    if categoria_sel != "Todas las Categorías":
-        df_filtrado_maestra = df_filtrado_maestra[df_filtrado_maestra["Category"] == categoria_sel]
-        df_filtrado_cv = df_filtrado_cv[df_filtrado_cv["Category"] == categoria_sel]
-
-    sub_options = ["Todas las Subcategorías"] + sorted(df_filtrado_maestra["Subcategory"].unique().tolist())
-    subcategoria_sel = st.selectbox("Subcategoría", sub_options)
-    
-    if subcategoria_sel != "Todas las Subcategorías":
-        df_filtrado_maestra = df_filtrado_maestra[df_filtrado_maestra["Subcategory"] == subcategoria_sel]
-        df_filtrado_cv = df_filtrado_cv[df_filtrado_cv["Subcategory"] == subcategoria_sel]
+    st.page_link("Inicio.py", label="Inicio")
+    st.page_link("pages/1_Inventario.py", label="Inventario")
+    st.page_link("pages/2_Ventas.py", label="Ventas")
+    st.page_link("pages/3_Alertas.py", label="Alertas")
+    st.page_link("pages/4_Pronosticos.py", label="Pronósticos")
 
     st.divider()
-    st.markdown("### Configuración de Tablas")
-    top_n = st.slider("Cantidad de productos (Top N):", min_value=1, max_value=50, value=10, step=1)
 
-# ==========================================
-# HEADER Y KPIs (Siempre Visibles)
-# ==========================================
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">Centro de Ventas y Demanda</h1>
-    <div class="hero-divider"></div>
-</div>
-""", unsafe_allow_html=True)
+    st.markdown("### Filtros")
+
+    fecha_min = df_base["Date"].min().date()
+    fecha_max = df_base["Date"].max().date()
+
+    rango_fechas = st.date_input(
+        "Rango de fechas",
+        value=(fecha_min, fecha_max),
+        min_value=fecha_min,
+        max_value=fecha_max
+    )
+
+    regiones = sorted(df_base["Region"].dropna().unique().tolist())
+    region_sel = st.selectbox("Región", ["Todas"] + regiones)
+
+    categorias = sorted(df_base["Category"].dropna().unique().tolist())
+    categoria_sel = st.selectbox("Categoría", ["Todas"] + categorias)
+
+    # Subcategoría dependiente de fecha, región y categoría
+    df_subcategorias = df_base.copy()
+
+    if isinstance(rango_fechas, tuple) and len(rango_fechas) == 2:
+        fecha_inicio, fecha_fin = rango_fechas
+        df_subcategorias = df_subcategorias[
+            (df_subcategorias["Date"].dt.date >= fecha_inicio) &
+            (df_subcategorias["Date"].dt.date <= fecha_fin)
+        ]
+
+    if region_sel != "Todas":
+        df_subcategorias = df_subcategorias[df_subcategorias["Region"] == region_sel]
+
+    if categoria_sel != "Todas":
+        df_subcategorias = df_subcategorias[df_subcategorias["Category"] == categoria_sel]
+
+    subcategorias = sorted(df_subcategorias["Subcategory"].dropna().unique().tolist())
+    subcategoria_sel = st.selectbox("Subcategoría", ["Todas"] + subcategorias)
+
+    st.divider()
+    st.markdown("### Configuración")
+    top_n = st.slider("Cantidad de productos (Top N)", min_value=1, max_value=50, value=10, step=1)
+
+
+# =========================
+# Aplicar filtros
+# =========================
+df_filtrado_maestra = df_base.copy()
+df_filtrado_cv = df_cv.copy()
+
+if isinstance(rango_fechas, tuple) and len(rango_fechas) == 2:
+    fecha_inicio, fecha_fin = rango_fechas
+    df_filtrado_maestra = df_filtrado_maestra[
+        (df_filtrado_maestra["Date"].dt.date >= fecha_inicio) &
+        (df_filtrado_maestra["Date"].dt.date <= fecha_fin)
+    ]
+
+    if "Date" in df_filtrado_cv.columns:
+        df_filtrado_cv = df_filtrado_cv[
+            (df_filtrado_cv["Date"].dt.date >= fecha_inicio) &
+            (df_filtrado_cv["Date"].dt.date <= fecha_fin)
+        ]
+
+if region_sel != "Todas":
+    df_filtrado_maestra = df_filtrado_maestra[df_filtrado_maestra["Region"] == region_sel]
+    if "Region" in df_filtrado_cv.columns:
+        df_filtrado_cv = df_filtrado_cv[df_filtrado_cv["Region"] == region_sel]
+
+if categoria_sel != "Todas":
+    df_filtrado_maestra = df_filtrado_maestra[df_filtrado_maestra["Category"] == categoria_sel]
+    if "Category" in df_filtrado_cv.columns:
+        df_filtrado_cv = df_filtrado_cv[df_filtrado_cv["Category"] == categoria_sel]
+
+if subcategoria_sel != "Todas":
+    df_filtrado_maestra = df_filtrado_maestra[df_filtrado_maestra["Subcategory"] == subcategoria_sel]
+    if "Subcategory" in df_filtrado_cv.columns:
+        df_filtrado_cv = df_filtrado_cv[df_filtrado_cv["Subcategory"] == subcategoria_sel]
+
+
+# =========================
+# Encabezado
+# =========================
+st.markdown(
+    '<h1 class="main-title">Centro de Ventas y Demanda</h1>',
+    unsafe_allow_html=True
+)
+
+
+# =========================
+# KPIs superiores
+# =========================
+revenue_total = safe_sum(df_filtrado_maestra["Sales_amount"])
+unidades_vendidas = safe_sum(df_filtrado_maestra["Units_sold"])
+
+if not df_filtrado_maestra.empty and "Product_name" in df_filtrado_maestra.columns:
+    top_product = (
+        df_filtrado_maestra
+        .groupby("Product_name")["Sales_amount"]
+        .sum()
+        .sort_values(ascending=False)
+        .index[0]
+    )
+else:
+    top_product = "N/A"
+
+if not df_filtrado_maestra.empty and "Product_id" in df_filtrado_maestra.columns:
+    productos_vendidos = df_filtrado_maestra["Product_id"].nunique()
+else:
+    productos_vendidos = 0
 
 col_kpi1, col_kpi2, col_kpi3 = st.columns(3)
-kpi_style = "background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 1px solid #bfdbfe; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.02); min-height: 160px; height: 100%; display: flex; flex-direction: column; justify-content: space-between; align-items: center;"
 
 with col_kpi1:
-    revenue_total = df_filtrado_maestra["Sales_amount"].sum()
-    st.markdown(f"""
-    <div style="{kpi_style}">
-        <div style="font-size: 0.85rem; font-weight: 700; color: #1d4ed8; text-transform: uppercase; letter-spacing: 1px;">Revenue Generado</div>
-        <div style="font-size: clamp(1.2rem, 3vw, 1.8rem); font-weight: 800; color: #0f172a;">${revenue_total:,.0f}</div>
-        <div style="font-size: 0.8rem; color: #64748b;">Ingresos totales en selección</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
+    components.html(
+        compact_metric_card(
+            title="Revenue Generado",
+            value=f"${revenue_total:,.0f}",
+            description="Ingresos totales dentro de la selección",
+            accent_color="#16a34a"
+        ),
+        height=160,
+        scrolling=False
+    )
+
 with col_kpi2:
-    unidades_vendidas = df_filtrado_maestra["Units_sold"].sum()
-    st.markdown(f"""
-    <div style="{kpi_style}">
-        <div style="font-size: 0.85rem; font-weight: 700; color: #1d4ed8; text-transform: uppercase; letter-spacing: 1px;">Volumen Movido</div>
-        <div style="font-size: clamp(1.2rem, 3vw, 1.8rem); font-weight: 800; color: #0f172a;">{unidades_vendidas:,.0f} uds</div>
-        <div style="font-size: 0.8rem; color: #64748b;">Total de unidades despachadas</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
+    components.html(
+        compact_metric_card(
+            title="Volumen Movido",
+            value=f"{unidades_vendidas:,.0f} uds",
+            description="Total de unidades vendidas o despachadas",
+            accent_color="#2563eb"
+        ),
+        height=160,
+        scrolling=False
+    )
+
 with col_kpi3:
-    if not df_filtrado_maestra.empty:
-        top_product = df_filtrado_maestra.groupby("Product_name")["Sales_amount"].sum().idxmax()
-    else:
-        top_product = "N/A"
-    st.markdown(f"""
-    <div style="{kpi_style}">
-        <div style="font-size: 0.85rem; font-weight: 700; color: #1d4ed8; text-transform: uppercase; letter-spacing: 1px;">Producto Estrella</div>
-        <div style="font-size: clamp(1rem, 2vw, 1.2rem); font-weight: 800; color: #0f172a; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; padding: 4px 0;">{top_product}</div>
-        <div style="font-size: 0.8rem; color: #64748b;">Mayor generador de ingresos</div>
-    </div>
-    """, unsafe_allow_html=True)
+    components.html(
+        compact_metric_card(
+            title="Producto Estrella",
+            value=top_product,
+            description=f"Mayor generador de ingresos · {productos_vendidos:,} productos activos",
+            accent_color="#7c3aed"
+        ),
+        height=160,
+        scrolling=False
+    )
 
-st.write("")
-st.write("")
 
-# ==========================================
-# PESTAÑAS (TABS) PARA LAS GRÁFICAS
-# ==========================================
+# =========================
+# Gráficas
+# =========================
+plot_config = {"responsive": True, "displayModeBar": False}
+
 tab1, tab2 = st.tabs(["Análisis por Segmento", "Tendencias Anuales"])
 
-# Configuración que forzará a Plotly a responder dinámicamente al navegador
-plot_config = {'responsive': True, 'displayModeBar': False}
-
-# --- PESTAÑA 1: SEGMENTOS ---
 with tab1:
     col_c1, col_c2 = st.columns(2)
 
     with col_c1:
-        st.markdown('<div class="section-title">Categorías por Perfil de Comprador</div>', unsafe_allow_html=True)
-        if not df_filtrado_cv.empty:
-            df_perfiles = df_filtrado_cv.groupby(["Segmento_Cliente", "Category"], observed=False)["Sales_amount"].sum().reset_index()
-            fig_bar = px.bar(
-                df_perfiles, x="Segmento_Cliente", y="Sales_amount", color="Category", barmode="group",
-                labels={"Sales_amount": "Ventas ($)", "Segmento_Cliente": "Segmento"},
-                color_discrete_sequence=px.colors.qualitative.Set2 
+        with st.container(border=True):
+            st.markdown(
+                chart_header(
+                    "Categorías por perfil de comprador",
+                    "Compara los ingresos generados por categoría en cada segmento de cliente."
+                ),
+                unsafe_allow_html=True
             )
-            # Forzar formato entero en los ejes
-            fig_bar.update_layout(autosize=True, margin=dict(t=10, l=10, r=10, b=10), height=350, plot_bgcolor="rgba(0,0,0,0)", legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1), yaxis=dict(tickformat="d"))
-            st.plotly_chart(fig_bar, use_container_width=True, config=plot_config)
-        else:
-            st.info("Sin datos de clientes para estos filtros.")
+
+            if not df_filtrado_cv.empty:
+                df_perfiles = (
+                    df_filtrado_cv
+                    .groupby(["Segmento_Cliente", "Category"], observed=False)["Sales_amount"]
+                    .sum()
+                    .reset_index()
+                )
+
+                fig_bar = px.bar(
+                    df_perfiles,
+                    x="Segmento_Cliente",
+                    y="Sales_amount",
+                    color="Category",
+                    barmode="group",
+                    labels={"Sales_amount": "Ventas ($)", "Segmento_Cliente": "Segmento"},
+                    color_discrete_sequence=px.colors.qualitative.Set2
+                )
+
+                fig_bar.update_layout(
+                    autosize=True,
+                    height=330,
+                    margin=dict(t=10, l=10, r=10, b=10),
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1),
+                    yaxis=dict(tickformat="d", gridcolor="#e2e8f0"),
+                    xaxis=dict(title="")
+                )
+
+                st.plotly_chart(fig_bar, use_container_width=True, config=plot_config)
+            else:
+                st.info("Sin datos de clientes para estos filtros.")
 
     with col_c2:
-        st.markdown('<div class="section-title">Concentración Geográfica por Segmento</div>', unsafe_allow_html=True)
-        if not df_filtrado_cv.empty:
-            df_geo = df_filtrado_cv.groupby(["Region", "Segmento_Cliente"], observed=False)["Sales_amount"].sum().reset_index()
-            orden_regiones = df_geo.groupby("Region")["Sales_amount"].sum().sort_values(ascending=True).index
-            colores_segmento = {"Ticket Bajo": "#3b82f6", "Ticket Medio": "#10b981", "Ticket Alto": "#f59e0b"}
-            
-            fig_geo = px.bar(
-                df_geo, x="Sales_amount", y="Region", color="Segmento_Cliente", orientation="h", barmode="stack",
-                labels={"Sales_amount": "Ventas ($)", "Region": "", "Segmento_Cliente": "Segmento"},
-                color_discrete_map=colores_segmento
+        with st.container(border=True):
+            st.markdown(
+                chart_header(
+                    "Concentración geográfica por segmento",
+                    "Muestra qué regiones concentran más ventas según el perfil de comprador."
+                ),
+                unsafe_allow_html=True
             )
-            # Forzar formato entero en los ejes
-            fig_geo.update_layout(autosize=True, margin=dict(t=10, l=10, r=10, b=10), height=350, plot_bgcolor="rgba(0,0,0,0)", legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1), yaxis=dict(categoryorder="array", categoryarray=orden_regiones), xaxis=dict(tickformat="d"))
-            st.plotly_chart(fig_geo, use_container_width=True, config=plot_config)
-        else:
-            st.info("Sin datos geográficos para graficar.")
 
-# --- PESTAÑA 2: TENDENCIAS ---
+            if not df_filtrado_cv.empty:
+                df_geo = (
+                    df_filtrado_cv
+                    .groupby(["Region", "Segmento_Cliente"], observed=False)["Sales_amount"]
+                    .sum()
+                    .reset_index()
+                )
+
+                orden_regiones = (
+                    df_geo.groupby("Region")["Sales_amount"]
+                    .sum()
+                    .sort_values(ascending=True)
+                    .index
+                )
+
+                colores_segmento = {
+                    "Ticket Bajo": "#3b82f6",
+                    "Ticket Medio": "#10b981",
+                    "Ticket Alto": "#f59e0b"
+                }
+
+                fig_geo = px.bar(
+                    df_geo,
+                    x="Sales_amount",
+                    y="Region",
+                    color="Segmento_Cliente",
+                    orientation="h",
+                    barmode="stack",
+                    labels={"Sales_amount": "Ventas ($)", "Region": "", "Segmento_Cliente": "Segmento"},
+                    color_discrete_map=colores_segmento
+                )
+
+                fig_geo.update_layout(
+                    autosize=True,
+                    height=330,
+                    margin=dict(t=10, l=10, r=10, b=10),
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1),
+                    yaxis=dict(categoryorder="array", categoryarray=orden_regiones),
+                    xaxis=dict(tickformat="d", gridcolor="#e2e8f0")
+                )
+
+                st.plotly_chart(fig_geo, use_container_width=True, config=plot_config)
+            else:
+                st.info("Sin datos geográficos para graficar.")
+
 with tab2:
-    st.markdown('<div class="section-title">Evolución Anual de Subcategorías</div>', unsafe_allow_html=True)
+    with st.container(border=True):
+        st.markdown(
+            chart_header(
+                "Evolución anual de subcategorías",
+                "Visualiza la tendencia mensual de ingresos por subcategoría."
+            ),
+            unsafe_allow_html=True
+        )
 
-    if not df_filtrado_maestra.empty:
-        df_tendencia = df_filtrado_maestra.set_index("Date").groupby([pd.Grouper(freq="ME"), "Subcategory"])["Sales_amount"].sum().reset_index()
-        fig_line = px.line(
-            df_tendencia, x="Date", y="Sales_amount", color="Subcategory", markers=True,
-            labels={"Date": "Mes", "Sales_amount": "Ingresos Mensuales ($)"}
-        )
-        fig_line.update_traces(hovertemplate="<b>%{data.name}</b><extra></extra>")
-        
-        # Forzar formato entero en los ejes
-        fig_line.update_layout(
-            autosize=True, margin=dict(t=10, l=10, r=10, b=10), height=350, plot_bgcolor="rgba(0,0,0,0)",
-            yaxis=dict(gridcolor="#e2e8f0", tickformat="d"), xaxis=dict(gridcolor="#e2e8f0", title="", tickformat="%b %Y"), 
-            hovermode="closest"
-        )
-        st.plotly_chart(fig_line, use_container_width=True, config=plot_config)
-    else:
-        st.info("Sin datos para trazar la tendencia temporal.")
+        if not df_filtrado_maestra.empty:
+            df_tendencia = (
+                df_filtrado_maestra
+                .set_index("Date")
+                .groupby([pd.Grouper(freq="ME"), "Subcategory"])["Sales_amount"]
+                .sum()
+                .reset_index()
+            )
+
+            fig_line = px.line(
+                df_tendencia,
+                x="Date",
+                y="Sales_amount",
+                color="Subcategory",
+                markers=True,
+                labels={"Date": "Mes", "Sales_amount": "Ingresos mensuales ($)"}
+            )
+
+            fig_line.update_traces(hovertemplate="<b>%{data.name}</b><br>Ventas: $%{y:,.0f}<extra></extra>")
+            fig_line.update_layout(
+                autosize=True,
+                height=350,
+                margin=dict(t=10, l=10, r=10, b=10),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                yaxis=dict(gridcolor="#e2e8f0", tickformat="d"),
+                xaxis=dict(gridcolor="#e2e8f0", title="", tickformat="%b %Y"),
+                hovermode="closest"
+            )
+
+            st.plotly_chart(fig_line, use_container_width=True, config=plot_config)
+        else:
+            st.info("Sin datos para trazar la tendencia temporal.")

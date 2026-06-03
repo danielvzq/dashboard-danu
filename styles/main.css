@@ -1,5 +1,4 @@
 /* ── Ocultar elementos de Streamlit ─────────────────────────── */
-#MainMenu { visibility: hidden; }
 footer    { visibility: hidden; }
 .stDeployButton { display: none; }
 [data-testid="stSidebarNav"] { display: none; }

@@ -31,46 +31,267 @@ from src.redistribucion import (
     build_animation_frames,
 )
 
-# CONFIG
-st.set_page_config(page_title="Pronósticos — DANUStore", layout="wide")
+# =========================
+# Configuración de página
+# =========================
+st.set_page_config(
+    layout="wide",
+    page_title="Pronósticos — DANUStore",
+    page_icon="🚀"
+)
 
+
+# =========================
+# CSS general compacto
+# =========================
+st.markdown(
+    """
+    <style>
+        .block-container {
+            padding-top: 2.2rem !important;
+            padding-bottom: 0.8rem !important;
+            padding-left: 1.4rem !important;
+            padding-right: 1.4rem !important;
+            max-width: 100% !important;
+        }
+
+        h1, h2, h3, h4 {
+            margin-top: 0 !important;
+            margin-bottom: 0.6rem !important;
+        }
+
+        
+
+        .main-title {
+            color: white;
+            font-size: 30px;
+            font-weight: 950;
+            letter-spacing: -0.8px;
+            margin: 0 0 6px 0;
+            line-height: 1.2;
+        }
+
+        .forecast-context {
+            color: rgba(255, 255, 255, 0.78);
+            font-size: 13px;
+            font-weight: 700;
+            margin: 0 0 16px 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        div[data-testid="stVerticalBlock"] {
+            gap: 0.65rem !important;
+        }
+
+        div[data-testid="stHorizontalBlock"] {
+            gap: 0.8rem !important;
+        }
+
+        iframe {
+            display: block;
+        }
+
+        .chart-card-header {
+            padding: 4px 8px 0 8px;
+            margin-bottom: 6px;
+        }
+
+        .chart-card-header h3 {
+            color: #0f172a;
+            font-size: 22px;
+            font-weight: 900;
+            margin: 0;
+            letter-spacing: -0.4px;
+        }
+
+        .chart-card-header p {
+            color: #64748b;
+            font-size: 14px;
+            font-weight: 600;
+            margin: 6px 0 0 0;
+            line-height: 1.35;
+        }
+
+        [data-testid="stVerticalBlockBorderWrapper"] {
+            border-radius: 24px !important;
+            border: 1px solid rgba(148, 163, 184, 0.22) !important;
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.035) !important;
+            padding: 0.4rem 0.6rem !important;
+        }
+
+        div[data-testid="stPlotlyChart"] {
+            border-radius: 24px !important;
+            border: 1px solid rgba(148, 163, 184, 0.22) !important;
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.035) !important;
+            padding: 0.45rem 0.65rem !important;
+        }
+
+        div[data-testid="stMetric"] {
+            border-radius: 18px !important;
+            border: 1px solid rgba(148, 163, 184, 0.22) !important;
+            background: rgba(255, 255, 255, 0.88) !important;
+            padding: 0.65rem 0.75rem !important;
+        }
+
+        div[data-testid="stDataFrame"] {
+            border-radius: 20px !important;
+            overflow: hidden !important;
+            border: 1px solid rgba(148, 163, 184, 0.22) !important;
+            background: #ffffff !important;
+        }
+
+        button[kind="secondary"], button[data-baseweb="tab"] {
+            border-radius: 999px !important;
+            font-weight: 800 !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# =========================
+# Cargar CSS personalizado
+# =========================
 css_path = Path("styles/main.css")
+
 if css_path.exists():
-    with open(css_path) as f:
+    with open(css_path, encoding="utf-8") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-# TARJETA DE MÉTRICA
+# =========================
+# Tarjeta compacta superior
+# =========================
 def metric_card(title, value, description, badge, icon, accent, progress):
-    title=escape(str(title)); value=escape(str(value)); description=escape(str(description))
-    badge=escape(str(badge)); icon=escape(str(icon)); progress=max(0.0,min(float(progress),100.0))
-    return f"""<!DOCTYPE html><html><head><style>
-    body{{margin:0;font-family:Inter,system-ui,sans-serif;background:transparent;}}
-    .card{{background:linear-gradient(135deg,#ffffff 0%,#f8fafc 100%);
-        border:1px solid rgba(148,163,184,.22);border-radius:20px;padding:16px 20px;height:140px;
-        box-sizing:border-box;box-shadow:0 18px 40px rgba(15,23,42,.10);position:relative;overflow:hidden;}}
-    .card::before{{content:"";position:absolute;top:-40px;right:-40px;width:130px;height:130px;
-        background:{accent};opacity:.09;border-radius:999px;}}
-    .top{{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}}
-    .ttl{{color:#0f172a;font-size:12px;font-weight:900;margin:0;line-height:1.3;max-width:78%;}}
-    .ico{{min-width:34px;height:34px;border-radius:11px;background:{accent};color:white;
-        display:flex;align-items:center;justify-content:center;font-size:16px;
-        box-shadow:0 8px 18px rgba(15,23,42,.16);font-weight:900;}}
-    .val{{color:#0f172a;font-size:18px;font-weight:950;letter-spacing:-.5px;line-height:1;
-        margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}}
-    .desc{{color:#64748b;font-size:10px;font-weight:600;margin:4px 0 0 0;line-height:1.3;}}
-    .foot{{display:flex;align-items:center;gap:6px;margin-top:8px;}}
-    .badge{{background:rgba(15,23,42,.06);color:#334155;font-size:10px;font-weight:800;
-        padding:4px 9px;border-radius:999px;white-space:nowrap;}}
-    .track{{flex:1;height:6px;background:#e5e7eb;border-radius:999px;overflow:hidden;}}
-    .fill{{height:100%;width:{progress:.1f}%;background:{accent};border-radius:999px;}}
-    </style></head><body>
-    <div class="card">
-      <div class="top"><p class="ttl">{title}</p><div class="ico">{icon}</div></div>
-      <h1 class="val">{value}</h1><p class="desc">{description}</p>
-      <div class="foot"><span class="badge">{badge}</span>
-        <div class="track"><div class="fill"></div></div>
-      </div>
-    </div></body></html>"""
+    title = escape(str(title))
+    value = escape(str(value))
+    description = escape(str(description))
+    badge = escape(str(badge))
+    icon = escape(str(icon))
+
+    try:
+        progress = max(0, min(float(progress), 100))
+    except Exception:
+        progress = 0
+
+    return f"""
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+    body {{
+        margin: 0;
+        background: transparent;
+        font-family: Inter, system-ui, sans-serif;
+    }}
+
+    .metric-card {{
+        position: relative;
+        overflow: hidden;
+        height: 155px;
+        box-sizing: border-box;
+        border-radius: 24px;
+        padding: 26px 20px 18px 20px;
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        border: 1px solid rgba(148, 163, 184, 0.28);
+    }}
+
+    .metric-card::before {{
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 7px;
+        background: var(--accent-color);
+    }}
+
+    .metric-title {{
+        color: #0f172a;
+        font-size: 15px;
+        font-weight: 900;
+        margin: 0 0 14px 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }}
+
+    .metric-value {{
+        color: #0f172a;
+        font-size: clamp(20px, 2.1vw, 28px);
+        font-weight: 950;
+        line-height: 1.05;
+        margin: 0 0 8px 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }}
+
+    .metric-description {{
+        color: #64748b;
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.3;
+        margin: 0;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }}
+
+    .metric-footer {{
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 10px;
+    }}
+
+    .metric-badge {{
+        color: #334155;
+        background: rgba(15, 23, 42, 0.06);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 999px;
+        padding: 4px 9px;
+        font-size: 10px;
+        font-weight: 850;
+        white-space: nowrap;
+    }}
+
+    .metric-track {{
+        flex: 1;
+        height: 6px;
+        border-radius: 999px;
+        background: #e5e7eb;
+        overflow: hidden;
+    }}
+
+    .metric-fill {{
+        width: {progress:.1f}%;
+        height: 100%;
+        border-radius: 999px;
+        background: var(--accent-color);
+    }}
+</style>
+</head>
+
+<body>
+    <div class="metric-card" style="--accent-color: {accent};">
+        <p class="metric-title">{title}</p>
+        <p class="metric-value">{value}</p>
+        <p class="metric-description">{description}</p>
+        <div class="metric-footer">
+            <span class="metric-badge">{icon} {badge}</span>
+            <div class="metric-track"><div class="metric-fill"></div></div>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
 
 dot = lambda color: (
     f'<span style="display:inline-block;width:11px;height:11px;border-radius:50%;'
@@ -78,32 +299,109 @@ dot = lambda color: (
 )
 
 def _mini_kpi(label, value):
-    return (
-        f'<div style="background:#f8fafc;border:1px solid rgba(148,163,184,.22);'
-        f'border-radius:12px;padding:10px 14px;">'
-        f'<p style="margin:0;font-size:10px;font-weight:700;color:#64748b;">{label}</p>'
-        f'<p style="margin:2px 0 0 0;font-size:15px;font-weight:900;color:#0f172a;'
-        f'letter-spacing:-0.5px;">{value}</p></div>'
-    )
+    label = escape(str(label))
+    value = escape(str(value))
+
+    return f"""
+    <div style="
+        height: 74px;
+        box-sizing: border-box;
+        border-radius: 18px;
+        padding: 12px 14px;
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    ">
+        <p style="
+            margin: 0 0 6px 0;
+            font-size: 10px;
+            font-weight: 850;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: .25px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        ">{label}</p>
+        <p style="
+            margin: 0;
+            font-size: 20px;
+            font-weight: 950;
+            color: #0f172a;
+            letter-spacing: -0.6px;
+            line-height: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        ">{value}</p>
+    </div>
+    """
 
 
 def section_title(label, subtitle="", popover_title="Ver", popover_body=""):
     """Renders a prominent section title with an optional info popover beside it."""
-    col_t, col_p = st.columns([8, 1])
+
+    # CSS para evitar que el botón del popover se parta en varias líneas
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stPopover"] button {
+            min-width: 105px !important;
+            height: 38px !important;
+            white-space: nowrap !important;
+            border-radius: 999px !important;
+            font-weight: 700 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 0 16px !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Columna del botón más ancha para evitar que "Ver" se corte
+    col_t, col_p = st.columns([6.5, 1.7])
+
     with col_t:
-        sub_html = (
-            f"<span style='color:#94a3b8;font-weight:400;font-size:11px;"
-            f"margin-left:10px;'>{subtitle}</span>" if subtitle else ""
-        )
         st.markdown(
-            f"<p style='color:#0f172a;font-size:18px;font-weight:800;"
-            f"margin:0 0 4px 0;letter-spacing:-0.3px;'>"
-            f"{label}{sub_html}</p>",
+            f"""
+            <div class="chart-card-header" style="padding:0;margin-bottom:8px;">
+                <h3 style="
+                    color:#0f172a;
+                    font-size:20px;
+                    font-weight:900;
+                    margin:0;
+                    letter-spacing:-0.4px;
+                    line-height:1.15;
+                ">
+                    {label}
+                </h3>
+                <p style="
+                    color:#64748b;
+                    font-size:13px;
+                    font-weight:700;
+                    margin:8px 0 0 0;
+                    line-height:1.25;
+                ">
+                    {subtitle}
+                </p>
+            </div>
+            """,
             unsafe_allow_html=True,
         )
+
     with col_p:
         if popover_body:
-            with st.popover(popover_title, use_container_width=True):
+            st.markdown(
+                "<div style='height:4px;'></div>",
+                unsafe_allow_html=True
+            )
+
+            with st.popover(popover_title if popover_title else "Ver", use_container_width=True):
                 st.markdown(popover_body)
 
 # COLORES Y UMBRALES
@@ -152,7 +450,7 @@ MODEL_ACCURACY = compute_model_accuracy()
 # SIDEBAR
 with st.sidebar:
     st.markdown(
-        '<div class="sidebar-header"><div class="sidebar-icon">📦</div>'
+        '<div class="sidebar-header"><div class="sidebar-icon">🚀</div>'
         '<div><p class="sidebar-title">RocketData</p>'
         '<p class="sidebar-subtitle">Inventory Dashboard</p></div></div>',
         unsafe_allow_html=True,
@@ -243,24 +541,26 @@ worst_row  = fc_sorted.iloc[-1]; worst_name = worst_row["Subcategory"]; worst_pc
 best_badge,  best_accent  = growth_label(best_pct,  horizon)
 worst_badge, worst_accent = growth_label(worst_pct, horizon)
 
-# HEADER
-st.markdown("""<style>
-h4, h3, h2, h1 { color: #0f172a !important; }
-</style>""", unsafe_allow_html=True)
+# =========================
+# Encabezado
+# =========================
 ctx_parts = []
 if cat_sel     != "Todas": ctx_parts.append(f"Cat: {cat_sel}")
 if subcat_sel  != "Todas": ctx_parts.append(f"Sub: {subcat_sel}")
 if product_sel != "Todas": ctx_parts.append(f"Prod: {product_sel}")
 ctx_parts.append(f"{horizon} meses")
 ctx_str = "  ·  ".join(ctx_parts)
+
 st.markdown(
-    f"<p style='color:#0f172a;font-size:12px;font-weight:700;margin:0;"
-    f"white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>"
-    f"Pronósticos — {region_label}"
-    f"<span style='color:#94a3b8;font-weight:400;font-size:11px;margin-left:10px;'>{ctx_str}</span>"
-    f"</p>",
-    unsafe_allow_html=True,
+    '<h1 class="main-title">Panel de Pronósticos</h1>',
+    unsafe_allow_html=True
 )
+
+st.markdown(
+    f'<p class="forecast-context">{escape(str(region_label))}  ·  {escape(str(ctx_str))}</p>',
+    unsafe_allow_html=True
+)
+
 
 # 5 TABS
 tab_resumen, tab_analisis, tab_redist = st.tabs([
@@ -281,7 +581,7 @@ with tab_resumen:
             f"Histórico: {kpi_hist_units:,.0f} u · Variación: {sign_t}{kpi_growth_total:.1f}%",
             t1_badge, "→", t1_accent,
             min(abs(kpi_growth_total/ref25*100) if ref25>0 else 70, 100),
-        ), height=150)
+        ), height=160, scrolling=False)
 
     with c2:
         components.html(metric_card(
@@ -289,7 +589,7 @@ with tab_resumen:
             f"+{best_pct:.1f}% según Prophet · {annualize(best_pct,horizon):+.1f}% anualizado",
             best_badge, "+", best_accent,
             min(abs(best_pct/ref25*100) if ref25>0 else 0, 100),
-        ), height=150)
+        ), height=160, scrolling=False)
 
     with c3:
         sign3 = "+" if worst_pct >= 0 else ""
@@ -298,80 +598,220 @@ with tab_resumen:
             f"{sign3}{worst_pct:.1f}% según Prophet · {annualize(worst_pct,horizon):+.1f}% anualizado",
             worst_badge, "!", worst_accent,
             min(abs(worst_pct/ref25*100) if ref25>0 else 0, 100),
-        ), height=150)
+        ), height=160, scrolling=False)
 
     st.divider()
 
     col_bar, col_acc = st.columns([3, 1], gap="large")
 
     with col_bar:
-        st.markdown(f"### Crecimiento por subcategoria · {region_label}")
-        fc_bar     = forecast_df.sort_values("Growth_pct", ascending=False)
+        section_title(
+            "Crecimiento por subcategoría",
+            subtitle=f"{region_label} · Prophet · {horizon} meses",
+        )
+
+        fc_bar = forecast_df.sort_values("Growth_pct", ascending=False)
         colors_bar = [bar_color(v, horizon) for v in fc_bar["Growth_pct"]]
+
         fig_bar = go.Figure()
+
         fig_bar.add_trace(go.Bar(
-            x=fc_bar["Growth_pct"], y=fc_bar["Subcategory"],
+            x=fc_bar["Growth_pct"],
+            y=fc_bar["Subcategory"],
             orientation="h",
             text=[f"{v:+.1f}%" for v in fc_bar["Growth_pct"]],
             textposition="outside",
+            cliponaxis=False,
             marker=dict(color=colors_bar, opacity=0.88),
-            customdata=np.stack([fc_bar["Forecast_avg"]*horizon,
-                                 fc_bar["Hist_avg"]*horizon], axis=-1),
+            customdata=np.stack(
+                [
+                    fc_bar["Forecast_avg"] * horizon,
+                    fc_bar["Hist_avg"] * horizon
+                ],
+                axis=-1
+            ),
             hovertemplate=(
                 "<b>%{y}</b><br>Crecimiento: %{x:+.1f}%<br>"
                 "Forecast total: %{customdata[0]:,.0f} u<br>"
                 "Histórico total: %{customdata[1]:,.0f} u<extra></extra>"
             ),
         ))
-        fig_bar.add_vline(x=ref15, line=dict(color="#f59e0b", width=1.5, dash="dot"),
-            annotation_text=f"15% anual ({ref15:.1f}% en {horizon}m)",
-            annotation_position="top", annotation_font=dict(color="#b45309", size=10))
-        fig_bar.add_vline(x=ref25, line=dict(color="#16a34a", width=1.5, dash="dot"),
-            annotation_text=f"25% anual ({ref25:.1f}% en {horizon}m)",
-            annotation_position="top", annotation_font=dict(color="#15803d", size=10))
-        fig_bar.update_layout(
-            height=300, plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
-            font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
-            margin=dict(l=10, r=100, t=20, b=30),
-            yaxis=dict(autorange="reversed", tickfont=dict(size=12)),
-            xaxis=dict(title=f"Crecimiento Prophet en {horizon} meses (%)",
-                       showgrid=True, gridcolor="rgba(148,163,184,.20)",
-                       zeroline=True, zerolinecolor="rgba(148,163,184,.40)", zerolinewidth=1.5),
+
+        # Líneas guía sin texto automático para evitar que se encimen
+        fig_bar.add_vline(
+            x=ref15,
+            line=dict(color="#f59e0b", width=1.5, dash="dot")
         )
-        st.plotly_chart(fig_bar, use_container_width=True)
+
+        fig_bar.add_vline(
+            x=ref25,
+            line=dict(color="#16a34a", width=1.5, dash="dot")
+        )
+
+        # Etiqueta de 15% anual, arriba y ligeramente a la izquierda
+        fig_bar.add_annotation(
+            x=ref15,
+            y=1.15,
+            xref="x",
+            yref="paper",
+            text=f"15% anual ({ref15:.1f}% en {horizon}m)",
+            showarrow=False,
+            font=dict(color="#b45309", size=10),
+            bgcolor="rgba(255,255,255,0.95)",
+            bordercolor="rgba(245,158,11,0.30)",
+            borderwidth=1,
+            borderpad=4,
+            xanchor="center",
+            yanchor="bottom",
+            xshift=-28
+        )
+
+        # Etiqueta de 25% anual, más abajo y ligeramente a la derecha
+        fig_bar.add_annotation(
+            x=ref25,
+            y=1.05,
+            xref="x",
+            yref="paper",
+            text=f"25% anual ({ref25:.1f}% en {horizon}m)",
+            showarrow=False,
+            font=dict(color="#15803d", size=10),
+            bgcolor="rgba(255,255,255,0.95)",
+            bordercolor="rgba(22,163,74,0.30)",
+            borderwidth=1,
+            borderpad=4,
+            xanchor="center",
+            yanchor="bottom",
+            xshift=28
+        )
+
+        # Rango dinámico para que no se corten textos fuera de las barras
+        x_min = min(0, fc_bar["Growth_pct"].min(), ref15, ref25)
+        x_max = max(fc_bar["Growth_pct"].max(), ref15, ref25)
+
+        padding = (x_max - x_min) * 0.18 if x_max != x_min else 1
+
+        fig_bar.update_layout(
+            height=300,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(
+                color="#0f172a",
+                family="Inter, system-ui, sans-serif"
+            ),
+            margin=dict(l=10, r=120, t=70, b=30),
+            yaxis=dict(
+                autorange="reversed",
+                tickfont=dict(size=12),
+                automargin=True
+            ),
+            xaxis=dict(
+                title=f"Crecimiento Prophet en {horizon} meses (%)",
+                showgrid=True,
+                gridcolor="rgba(148,163,184,.20)",
+                zeroline=True,
+                zerolinecolor="rgba(148,163,184,.40)",
+                zerolinewidth=1.5,
+                range=[x_min, x_max + padding]
+            ),
+        )
+
+        st.plotly_chart(
+            fig_bar,
+            use_container_width=True,
+            config={"displayModeBar": False}
+        )
 
 
     with col_acc:
-        st.markdown("### Confianza del modelo")
-        st.markdown("<br>", unsafe_allow_html=True)
-        acc_color = "#16a34a" if MODEL_ACCURACY>=85 else "#f59e0b" if MODEL_ACCURACY>=75 else "#dc2626"
+        section_title(
+            "Confiabilidad",
+            subtitle="Walk-forward · histórico",
+        )
+
+        acc_color = (
+            "#16a34a" if MODEL_ACCURACY >= 85
+            else "#f59e0b" if MODEL_ACCURACY >= 75
+            else "#dc2626"
+        )
+
         fig_gauge = go.Figure(go.Indicator(
-            mode="gauge+number", value=MODEL_ACCURACY,
-            number=dict(suffix="%", font=dict(size=32, color="#0f172a",
-                        family="Inter, system-ui, sans-serif")),
-            gauge=dict(
-                axis=dict(range=[0,100], tickwidth=1, tickcolor="#cbd5e1",
-                          tickfont=dict(size=10, color="#64748b")),
-                bar=dict(color=acc_color, thickness=0.55),
-                bgcolor="#f8fafc", borderwidth=0,
-                steps=[dict(range=[0,75],  color="#fee2e2"),
-                       dict(range=[75,85], color="#fef3c7"),
-                       dict(range=[85,100],color="#dcfce7")],
-                threshold=dict(line=dict(color="#0f172a", width=2),
-                               thickness=0.75, value=MODEL_ACCURACY),
+            mode="gauge+number",
+            value=MODEL_ACCURACY,
+            domain={
+    "x": [0.08, 0.92],
+    "y": [0.06, 0.68]
+},
+            number=dict(
+                suffix="%",
+                font=dict(
+                    size=34,
+                    color="#0f172a",
+                    family="Inter, system-ui, sans-serif"
+                )
             ),
-            title=dict(
-                text=("Accuracy general<br>"
-                      "<span style='font-size:11px;color:#64748b'>"
-                      "Walk-forward · datos históricos</span>"),
-                font=dict(size=13, color="#0f172a",
-                          family="Inter, system-ui, sans-serif"),
+            gauge=dict(
+                shape="angular",
+                axis=dict(
+                    range=[0, 100],
+                    tickwidth=1,
+                    tickcolor="#cbd5e1",
+                    tickfont=dict(size=10, color="#64748b")
+                ),
+                bar=dict(
+                    color=acc_color,
+                    thickness=0.50
+                ),
+                bgcolor="#f8fafc",
+                borderwidth=0,
+                steps=[
+                    dict(range=[0, 75], color="#fee2e2"),
+                    dict(range=[75, 85], color="#fef3c7"),
+                    dict(range=[85, 100], color="#dcfce7")
+                ],
+                threshold=dict(
+                    line=dict(color="#0f172a", width=2),
+                    thickness=0.75,
+                    value=MODEL_ACCURACY
+                ),
             ),
         ))
-        fig_gauge.update_layout(height=270, paper_bgcolor="#ffffff",
-            margin=dict(l=20,r=20,t=60,b=10),
-            font=dict(family="Inter, system-ui, sans-serif"))
-        st.plotly_chart(fig_gauge, use_container_width=True)
+
+        fig_gauge.update_layout(
+            height=300,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=10, r=10, t=10, b=10),
+            font=dict(
+                family="Inter, system-ui, sans-serif",
+                color="#0f172a"
+            ),
+            annotations=[
+                dict(
+                    text=(
+                        "Accuracy general<br>"
+                        "<span style='font-size:12px;color:#64748b'>"
+                        "Walk-forward · datos históricos</span>"
+                    ),
+                    x=0.5,
+                    y=0.96,
+                    xref="paper",
+                    yref="paper",
+                    showarrow=False,
+                    align="center",
+                    font=dict(
+                        size=15,
+                        color="#0f172a",
+                        family="Inter, system-ui, sans-serif"
+                    )
+                )
+            ]
+        )
+
+        st.plotly_chart(
+            fig_gauge,
+            use_container_width=True,
+            config={"displayModeBar": False}
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -465,7 +905,7 @@ with tab_analisis:
         ))
         fig_dem.update_layout(
             height=260, hovermode="x unified",
-            plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
             font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
             margin=dict(l=40, r=20, t=5, b=25),
             xaxis=dict(showgrid=True, gridcolor="rgba(148,163,184,.20)",
@@ -474,7 +914,7 @@ with tab_analisis:
                        tickfont=dict(size=9)),
             legend=dict(orientation="h", y=1.15, x=0, font=dict(size=9)),
         )
-        st.plotly_chart(fig_dem, use_container_width=True)
+        st.plotly_chart(fig_dem, use_container_width=True, config={"displayModeBar": False})
     else:
         st.info("Sin datos suficientes (mínimo 6 meses).")
 
@@ -533,14 +973,14 @@ with tab_analisis:
             hovertemplate="<b>%{x}</b><br>%{y:,.0f} u<extra></extra>",
         ))
         fig_seas.update_layout(
-            height=250, plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+            height=250, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
             font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
             margin=dict(l=10, r=20, t=5, b=25),
             xaxis=dict(showgrid=False, tickfont=dict(size=9)),
             yaxis=dict(showgrid=True, gridcolor="rgba(148,163,184,.20)",
                        tickfont=dict(size=9), tickformat=",.0f"),
         )
-        st.plotly_chart(fig_seas, use_container_width=True)
+        st.plotly_chart(fig_seas, use_container_width=True, config={"displayModeBar": False})
 
     with col_reg:
         section_title(
@@ -568,7 +1008,7 @@ with tab_analisis:
         ))
         fig_comp.update_layout(
             barmode="group", height=250,
-            plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
             font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
             margin=dict(l=10, r=10, t=5, b=25),
             legend=dict(orientation="h", y=1.15, x=0, font=dict(size=9)),
@@ -576,7 +1016,7 @@ with tab_analisis:
             xaxis=dict(showgrid=True, gridcolor="rgba(148,163,184,.20)",
                        tickfont=dict(size=9), tickformat=",.0f"),
         )
-        st.plotly_chart(fig_comp, use_container_width=True)
+        st.plotly_chart(fig_comp, use_container_width=True, config={"displayModeBar": False})
 
 with tab_redist:
 
@@ -584,8 +1024,12 @@ with tab_redist:
     col_th, col_p1, col_toggle = st.columns([3, 1, 2])
     with col_th:
         st.markdown(
-            "<p style='color:#0f172a;font-size:18px;font-weight:800;margin:4px 0 0 0;'>"
-            "Redistribución de inventario</p>",
+            """
+            <div class="chart-card-header">
+                <h3>Redistribución de inventario</h3>
+                <p>Plan de transferencia basado en demanda proyectada y exceso de stock.</p>
+            </div>
+            """,
             unsafe_allow_html=True,
         )
     with col_p1:
@@ -656,7 +1100,7 @@ with tab_redist:
             frames=frames,
             layout=go.Layout(
                 height=490,
-                paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                 font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
                 margin=dict(l=0, r=0, t=55, b=0),
                 geo=GEO_LAYOUT,
@@ -694,7 +1138,7 @@ with tab_redist:
                 )],
             ),
         )
-        st.plotly_chart(fig_map, use_container_width=True)
+        st.plotly_chart(fig_map, use_container_width=True, config={"displayModeBar": False})
 
     # ── VISTA B: PLAN DE ENVÍOS ───────────────────────────────────────
     else:
@@ -766,7 +1210,7 @@ with tab_redist:
                 hovertemplate="<b>%{x}</b><br>%{y:,} u<extra></extra>",
             ))
             fig_prog.update_layout(
-                height=175, plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+                height=175, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                 font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
                 margin=dict(l=10, r=10, t=15, b=50),
                 xaxis=dict(showgrid=False, tickfont=dict(size=8)),
@@ -774,5 +1218,5 @@ with tab_redist:
                            tickfont=dict(size=8)),
                 showlegend=False,
             )
-            st.plotly_chart(fig_prog, use_container_width=True)
+            st.plotly_chart(fig_prog, use_container_width=True, config={"displayModeBar": False})
             st.caption("Azul = Enero  ·  Verde = Febrero  ·  Naranja = Marzo")
