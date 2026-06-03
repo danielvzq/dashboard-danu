@@ -1,28 +1,28 @@
-/* Ocultar el menú superior (hamburguesa) de Streamlit */
-#MainMenu {
-    visibility: hidden;
+/* ── Ocultar elementos de Streamlit ─────────────────────────── */
+#MainMenu { visibility: hidden; }
+footer    { visibility: hidden; }
+.stDeployButton { display: none; }
+[data-testid="stSidebarNav"] { display: none; }
+
+/* ── Eliminar scroll de la página ───────────────────────────── */
+html, body {
+    overflow: hidden !important;
+    height: 100% !important;
 }
 
-/* Ocultar el pie de página ("Made with Streamlit") */
-footer {
-    visibility: hidden;
-}
-
-/* Ocultar el botón de "Deploy" si llega a aparecer */
-.stDeployButton {
-    display: none;
-}
-
-/* Un pequeño ajuste para que el contenido suba un poco y aproveche mejor el espacio */
+/* ── Contenedor principal ────────────────────────────────────── */
 .block-container {
-    padding-top: 0.5rem;
-    padding-bottom: 0rem;
+    padding-top: 0.5rem !important;
+    padding-bottom: 0rem !important;
+    max-width: 100% !important;
 }
 
-[data-testid="stSidebarNav"] {
+/* Ocultar scrollbar interno */
+.main .block-container::-webkit-scrollbar {
     display: none;
 }
 
+/* ── Sidebar ─────────────────────────────────────────────────── */
 section[data-testid="stSidebar"] div[data-testid="stSidebarUserContent"] {
     padding-top: 0rem;
 }
@@ -60,6 +60,8 @@ section[data-testid="stSidebar"] div[data-testid="stSidebarUserContent"] {
     color: #a1a1aa;
     margin: 4px 0 0 0;
 }
+
+/* ── Cards personalizadas ────────────────────────────────────── */
 .custom-card {
     background: #ffffff;
     padding: 28px;
@@ -94,9 +96,8 @@ section[data-testid="stSidebar"] div[data-testid="stSidebarUserContent"] {
     margin-top: 18px;
 }
 
-.top5-list {
-    margin-top: 8px;
-}
+/* ── Top 5 list ──────────────────────────────────────────────── */
+.top5-list { margin-top: 8px; }
 
 .top5-row {
     display: flex;
@@ -117,20 +118,29 @@ section[data-testid="stSidebar"] div[data-testid="stSidebarUserContent"] {
     color: #dc2626;
     font-size: 16px;
 }
-/* Eliminar scroll de la página principal */
-html, body {
-    overflow: hidden !important;
-    height: 100% !important;
+
+/* ── Headings en negro ───────────────────────────────────────── */
+h1, h2, h3, h4 { color: #0f172a !important; }
+
+/* ── Tabs compactos ──────────────────────────────────────────── */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 4px;
+    padding: 2px 0;
+}
+.stTabs [data-baseweb="tab"] {
+    padding: 6px 16px !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
 }
 
-/* Reducir padding del contenedor principal para ganar espacio */
-.block-container {
-    padding-top: 0.5rem !important;
-    padding-bottom: 0rem !important;
-    max-width: 100% !important;
+/* ── Popovers: ancho completo en su columna ──────────────────── */
+[data-testid="stPopover"] button {
+    width: 100% !important;
+    font-size: 12px !important;
+    padding: 4px 10px !important;
 }
 
-/* Ocultar scrollbar visible pero mantener funcionalidad interna */
-.main .block-container::-webkit-scrollbar {
-    display: none;
-}
+/* ── Métricas compactas ──────────────────────────────────────── */
+[data-testid="stMetric"] { padding: 6px 0 !important; }
+[data-testid="stMetricLabel"] { font-size: 11px !important; }
+[data-testid="stMetricValue"] { font-size: 16px !important; }
