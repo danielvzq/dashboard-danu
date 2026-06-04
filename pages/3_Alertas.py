@@ -1,6 +1,7 @@
 # pages/3_Alertas.py
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from pathlib import Path
@@ -107,8 +108,8 @@ st.markdown(
         }
 
         .chart-card-header {
-            padding: 6px 8px 0 8px;
-            margin-bottom: 4px;
+            padding: 6px 8px 12px 8px; 
+            margin-bottom: 10px;       
         }
 
         .chart-card-header h3 {
@@ -123,7 +124,7 @@ st.markdown(
             color: #64748b;
             font-size: 13px;
             font-weight: 650;
-            margin: 4px 0 0 0;
+            margin: 4px 0 10px 0;
         }
 
         .section-title {
@@ -192,7 +193,6 @@ st.markdown(
 
         /* =========================
            Tarjetas regionales con hover original
-           Se mantienen colores: verde / naranja / rojo
         ========================= */
         .card-wrapper {
             border-radius: 24px;
@@ -353,7 +353,6 @@ st.markdown(
             border: none !important;
             border-radius: 14px !important;
             font-weight: 800 !important;
-            width: 100% !important;
             padding: 8px 14px !important;
             transition: all 0.3s ease !important;
             box-shadow: 0 5px 14px rgba(37, 99, 235, 0.22) !important;
@@ -371,6 +370,12 @@ st.markdown(
         [data-testid="stButton"] button span {
             color: white !important;
             margin: 0 !important;
+        }
+
+        button[data-testid="baseButton-secondary"] {
+            width: 220px !important; /* Este valor hace que mida lo mismo en todas partes */
+            min-width: 220px !important;
+            max-width: 220px !important;
         }
 
         /* Semáforo detalle */
@@ -576,14 +581,6 @@ def cargar_y_limpiar_datos():
     df["Subcategory"] = df["Subcategory"].astype(str).str.strip().str.title()
     df["Product_name"] = df["Product_name"].astype(str).str.strip()
 
-    df["Overstock_critico"] = (
-        df["Overstock_critico"]
-        .astype(str)
-        .str.lower()
-        .map({"true": True, "false": False, "1": True, "0": False})
-        .fillna(False)
-    )
-
     for col in ["Stock", "Static_price", "Percentage", "Units_expected", "Units_sold", "Stock_turnover", "Days_inventory"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
@@ -597,13 +594,29 @@ def cargar_y_limpiar_datos():
             .str.replace("OFF", "A REDUCIR", regex=False)
         )
 
-    df["Exceso_Porcentual"] = df["Percentage"] - 100.0
+    # ---------------------------------------------------------
+    # CÁLCULO BASE DEL EXCESO
+    # ---------------------------------------------------------
+    df["Excess_stock"] = (df["Stock"] - df["Units_sold"]).clip(lower=0)
+    df["Gap_pct"] = (df["Excess_stock"] / df["Stock"].replace(0, np.nan)) * 100
+    df["Gap_pct"] = df["Gap_pct"].fillna(0)
+    df["Exceso_Porcentual"] = df["Gap_pct"]
 
     return df
 
 
 try:
     df_base = cargar_y_limpiar_datos()
+    
+    # ---------------------------------------------------------
+    # UMBRALES BASADOS EN EL ESTÁNDAR DE LA INDUSTRIA (RETAIL MODA)
+    # ---------------------------------------------------------
+    UMBRAL_SANO = 20.0     # Hasta 20% es el stock de seguridad aceptable
+    UMBRAL_CRITICO = 35.0  # Por encima de 35% se considera riesgo alto de estancamiento
+    
+    # Se sobrescribe la columna para sincronizar todas las tablas del dashboard
+    df_base["Overstock_critico"] = df_base["Exceso_Porcentual"] >= UMBRAL_CRITICO
+
 except FileNotFoundError:
     st.error("No se encontró 'df_Maestra.csv' en la carpeta 'data/'.")
     st.stop()
@@ -612,15 +625,14 @@ except FileNotFoundError:
 if "zona_activa" not in st.session_state:
     st.session_state.zona_activa = "General"
 
-# Permite abrir el detalle desde un botón HTML integrado a la tarjeta
 zona_query = st.query_params.get("zona")
 if zona_query:
     st.session_state.zona_activa = str(zona_query)
 
 
-# =========================
+# ==========================================
 # Sidebar base
-# =========================
+# ==========================================
 with st.sidebar:
     render_sidebar_base()
 
@@ -645,7 +657,7 @@ if st.session_state.zona_activa == "General":
         df_base
         .groupby("Region", as_index=False)
         .agg({
-            "Percentage": "mean",
+            "Exceso_Porcentual": "mean",
             "Valor_Economico": "sum",
             "Stock_turnover": "mean"
         })
@@ -663,23 +675,27 @@ if st.session_state.zona_activa == "General":
 
             row = resumen_regiones.iloc[i + j]
             reg = row["Region"]
-            pct = row["Percentage"]
+            pct = row["Exceso_Porcentual"]
             rotacion = row["Stock_turnover"]
-            exceso_pct = pct - 100.0
+            exceso_pct = pct
 
-            if exceso_pct >= 25:
+            # LÓGICA BASADA EN EL ESTÁNDAR DE LA INDUSTRIA
+            if exceso_pct >= UMBRAL_CRITICO:
                 border_class = "border-critical"
-                estado = "Muy Crítico"
-            elif exceso_pct > 0:
-                border_class = "border-warning"
                 estado = "Crítico"
+            elif exceso_pct > UMBRAL_SANO:
+                border_class = "border-warning"
+                estado = "Moderado"
             else:
                 border_class = "border-healthy"
-                estado = "Saludable"
+                estado = "Sano"
 
-            delta_class = "delta-positive" if exceso_pct > 0 else "delta-negative"
-            sign = "+" if exceso_pct > 0 else ""
-            action_color = "#ef4444" if exceso_pct > 0 else "#10b981"
+            # Calculamos la desviación contra el ideal del 20%
+            delta_val = exceso_pct - UMBRAL_SANO
+            delta_class = "delta-positive" if delta_val > 0 else "delta-negative"
+            sign = "+" if delta_val > 0 else ""
+            
+            action_color = "#ef4444" if exceso_pct >= UMBRAL_CRITICO else ("#f59e0b" if exceso_pct > UMBRAL_SANO else "#10b981")
             reg_url = quote(str(reg), safe="")
 
             with cols[j]:
@@ -695,7 +711,7 @@ if st.session_state.zona_activa == "General":
                                     <div class="metric-item">
                                         <div class="metric-label">Sobrestock</div>
                                         <div class="metric-value">{pct:.1f}%</div>
-                                        <div class="delta-value {delta_class}">{sign}{exceso_pct:.1f}% vs ideal</div>
+                                        <div class="delta-value {delta_class}">{sign}{delta_val:.1f}% vs Ideal (20%)</div>
                                     </div>
                                     <div class="metric-item">
                                         <div class="metric-label">Rotación Prom.</div>
@@ -735,7 +751,7 @@ else:
 
     col_back, col_space = st.columns([1, 5])
     with col_back:
-        if st.button("Volver al resumen", type="secondary", use_container_width=True):
+        if st.button("Volver al resumen", type="secondary"):
             st.query_params.clear()
             st.session_state.zona_activa = "General"
             st.rerun()
@@ -786,7 +802,7 @@ else:
                 compact_metric_card(
                     "Capital en Riesgo",
                     formato_pesos(capital_riesgo),
-                    "Valor inmovilizado en sobrestock crítico",
+                    "Valor inmovilizado en sobrestock crítico (> 35%)",
                     "#dc2626"
                 ),
                 unsafe_allow_html=True
@@ -821,13 +837,14 @@ else:
             .groupby(eje_agrupacion, as_index=False)
             .agg(
                 Stock_Total=("Stock", "sum"),
-                Expected_Total=("Units_expected", "sum")
+                Ventas_Total=("Units_sold", "sum")
             )
         )
 
+        resumen_semaforo["Exceso_Unidades"] = (resumen_semaforo["Stock_Total"] - resumen_semaforo["Ventas_Total"]).clip(lower=0)
         resumen_semaforo["Exceso_Real"] = (
-            resumen_semaforo["Stock_Total"] / resumen_semaforo["Expected_Total"].replace(0, pd.NA) * 100
-        ).fillna(0) - 100.0
+            resumen_semaforo["Exceso_Unidades"] / resumen_semaforo["Stock_Total"].replace(0, np.nan) * 100
+        ).fillna(0)
 
         st.markdown(f'<div class="section-title">Nivel de Exceso Actual por {eje_agrupacion}</div>', unsafe_allow_html=True)
 
@@ -840,24 +857,27 @@ else:
                 exceso = row.Exceso_Real
                 nombre = getattr(row, eje_agrupacion)
 
-                if exceso >= 25:
-                    estado = "Muy Crítico"
-                    color_hex = "#dc2626"
-                elif exceso > 0:
+                # EVALUACIÓN ESTADÍSTICA DEL SEMÁFORO (Basado en el ideal 20%)
+                if exceso >= UMBRAL_CRITICO:
                     estado = "Crítico"
+                    color_hex = "#dc2626"
+                elif exceso > UMBRAL_SANO:
+                    estado = "Moderado"
                     color_hex = "#f59e0b"
                 else:
-                    estado = "Saludable"
+                    estado = "Sano"
                     color_hex = "#10b981"
 
-                signo = "+" if exceso > 0 else ""
+                # Delta vs el ideal
+                delta_val_sem = exceso - UMBRAL_SANO
+                signo = "+" if delta_val_sem > 0 else ""
 
                 with cols_sem[i % len(cols_sem)]:
                     st.markdown(
                         f"""
                         <div class="traffic-card" style="--status-color: {color_hex};">
                             <div class="traffic-name">{escape(str(nombre))}</div>
-                            <div class="traffic-value">{signo}{exceso:.1f}%</div>
+                            <div class="traffic-value">{exceso:.1f}%</div>
                             <div class="traffic-status">{estado}</div>
                         </div>
                         """,
@@ -869,7 +889,7 @@ else:
         with st.container(border=True):
             render_chart_header(
                 "Distribución estructural del capital estancado",
-                "El tamaño representa valor económico y el color muestra el nivel de exceso porcentual."
+                "El tamaño representa valor económico y el color muestra la desviación porcentual contra el ideal sano (20%)."
             )
 
             df_tree = df_filtrado[df_filtrado["Valor_Economico"] > 0].copy()
@@ -884,25 +904,36 @@ else:
                 else:
                     ruta_treemap = ["Subcategory", "Product_name"]
 
+                # Generación de la gráfica con colores acotados
                 fig_tree = px.treemap(
                     df_tree,
                     path=ruta_treemap,
                     values="Valor_Economico",
                     color="Exceso_Porcentual",
-                    color_continuous_scale="RdYlGn_r",
-                    color_continuous_midpoint=0
+                    color_continuous_scale=[
+                        (0.0, "#10b981"),  # 0% - Verde (Sano)
+                        (0.4, "#f59e0b"),  # 20% - Naranja (Moderado)
+                        (1.0, "#dc2626")   # 50%+ - Rojo (Crítico)
+                    ],
+                    range_color=[0, 50]  
                 )
 
+                # Ajuste de fuentes y CONTORNOS NEGROS (Porcentaje solo en el hover)
                 fig_tree.update_traces(
                     maxdepth=2,
                     textinfo="label+value",
-                    texttemplate="<b>%{label}</b><br>$%{value:,.0f}",
-                    hovertemplate="<b>%{label}</b><br>Capital: $%{value:,.0f}<br>Exceso: %{color:.0f}%<extra></extra>"
+                    texttemplate="<b>%{label}</b><br>$%{value:,.0f}", # <--- Revertido a solo Nombre y Capital
+                    hovertemplate="<b>%{label}</b><br>Capital: $%{value:,.0f}<br>Exceso: %{color:.1f}%<extra></extra>", # <--- Porcentaje visible al pasar el cursor
+                    textfont=dict(color="#ffffff", size=13), # Texto blanco puro
+                    root_color="#0f172a", # Color oscuro para el fondo
+                    marker=dict(
+                        line=dict(color="#000000", width=1.5) # Contorno negro para separar grupos
+                    )
                 )
 
                 fig_tree.update_layout(
                     autosize=True,
-                    margin=dict(t=10, l=10, r=10, b=10),
+                    margin=dict(t=25, l=10, r=10, b=10),
                     height=360,
                     paper_bgcolor="rgba(0,0,0,0)"
                 )
@@ -920,22 +951,22 @@ else:
             with st.container(border=True):
                 render_chart_header(
                     "Brecha operativa",
-                    "Compara stock real contra stock esperado para detectar excedentes estructurales."
+                    "Compara stock real contra ventas reales para detectar excedentes estructurales."
                 )
 
-                df_brecha = df_filtrado.groupby(eje_agrupacion, as_index=False)[["Stock", "Units_expected"]].sum()
+                df_brecha = df_filtrado.groupby(eje_agrupacion, as_index=False)[["Stock", "Units_sold"]].sum()
 
                 if not df_brecha.empty:
                     df_melted = df_brecha.melt(
                         id_vars=eje_agrupacion,
-                        value_vars=["Stock", "Units_expected"],
+                        value_vars=["Stock", "Units_sold"],
                         var_name="Tipo",
                         value_name="Unidades"
                     )
 
                     df_melted["Tipo"] = df_melted["Tipo"].replace({
                         "Stock": "Stock Real",
-                        "Units_expected": "Stock Esperado"
+                        "Units_sold": "Ventas Reales"
                     })
 
                     fig_brecha = px.bar(
@@ -944,7 +975,7 @@ else:
                         y="Unidades",
                         color="Tipo",
                         barmode="group",
-                        color_discrete_map={"Stock Real": "#ef4444", "Stock Esperado": "#3b82f6"}
+                        color_discrete_map={"Stock Real": "#ef4444", "Ventas Reales": "#3b82f6"}
                     )
 
                     fig_brecha.update_layout(
@@ -968,7 +999,7 @@ else:
             with st.container(border=True):
                 render_chart_header(
                     "Exceso de stock por periodo",
-                    "Muestra excedente positivo contra unidades vendidas a través del tiempo."
+                    "Muestra excedente positivo (Stock - Ventas) a través del tiempo."
                 )
 
                 if "Date" in df_filtrado.columns:
@@ -980,7 +1011,6 @@ else:
                         .groupby("Date", as_index=False)
                         .agg(
                             Stock=("Stock", "sum"),
-                            Units_expected=("Units_expected", "sum"),
                             Units_sold=("Units_sold", "sum")
                         )
                         .sort_values("Date")
@@ -989,7 +1019,7 @@ else:
                     df_tiempo = pd.DataFrame()
 
                 if not df_tiempo.empty:
-                    df_tiempo["Exceso_Unidades"] = df_tiempo["Stock"] - df_tiempo["Units_expected"]
+                    df_tiempo["Exceso_Unidades"] = df_tiempo["Stock"] - df_tiempo["Units_sold"]
                     df_tiempo["Exceso_Positivo"] = df_tiempo["Exceso_Unidades"].clip(lower=0)
 
                     fig_exceso = go.Figure()
@@ -1033,8 +1063,8 @@ else:
     with tab_tablas:
         with st.container(border=True):
             render_chart_header(
-                "Reportes de datos crudos",
-                "Consulta los productos críticos, baja rotación y máximos excesos por categoría."
+                "Reportes de datos consolidados",
+                "Consulta los promedios históricos de productos críticos, baja rotación y líderes de exceso."
             )
 
             sub_tab1, sub_tab2, sub_tab3 = st.tabs([
@@ -1043,79 +1073,71 @@ else:
                 "Más Crítico por Categoría"
             ])
 
-            with sub_tab1:
-                df_criticos = (
-                    df_filtrado[df_filtrado["Overstock_critico"] == True]
-                    .sort_values(by="Exceso_Porcentual", ascending=False)
-                )
-                col_criticos = [
-                    "Category", "Subcategory", "Product_name", "Stock", "Units_expected",
-                    "Exceso_Porcentual", "Units_sold", "Stock_turnover", "Priority_action"
-                ]
-                col_criticos = [col for col in col_criticos if col in df_criticos.columns]
-
-                st.dataframe(
-                    df_criticos[col_criticos].head(top_n),
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config={
-                        "Category": "Categoría",
-                        "Subcategory": "Subcategoría",
-                        "Product_name": "Producto",
-                        "Stock": st.column_config.NumberColumn("Stock Actual", format="%d"),
-                        "Units_expected": st.column_config.NumberColumn("Stock Planeado", format="%d"),
-                        "Exceso_Porcentual": st.column_config.NumberColumn("Exceso (%)", format="%.1f%%"),
-                        "Units_sold": st.column_config.NumberColumn("Ventas", format="%d"),
-                        "Stock_turnover": st.column_config.NumberColumn("Rotación", format="%.2fx"),
-                        "Priority_action": "Acción Recomendada"
-                    }
+            if not df_filtrado.empty:
+                # 1. CÁLCULO FIEL AL NOTEBOOK: Agrupar por producto para no ver filas repetidas por mes
+                resumen_prod = df_filtrado.groupby(['Category', 'Subcategory', 'Product_name'], as_index=False).agg(
+                    Total_vendido=('Units_sold', 'sum'),
+                    Avg_stock=('Stock', 'mean'),
+                    Avg_gap_pct=('Exceso_Porcentual', 'mean'),
+                    Avg_days_inv=('Days_inventory', 'mean'),
+                    Avg_turnover=('Stock_turnover', 'mean')
                 )
 
-            with sub_tab2:
-                df_rotacion = df_filtrado.sort_values(by="Days_inventory", ascending=False)
-                col_rotacion = ["Category", "Subcategory", "Product_name", "Stock", "Days_inventory", "Units_sold", "Stock_turnover"]
-                col_rotacion = [col for col in col_rotacion if col in df_rotacion.columns]
-
-                st.dataframe(
-                    df_rotacion[col_rotacion].head(top_n),
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config={
-                        "Category": "Categoría",
-                        "Subcategory": "Subcategoría",
-                        "Product_name": "Producto",
-                        "Stock": st.column_config.NumberColumn("Stock Real", format="%d"),
-                        "Days_inventory": st.column_config.NumberColumn("Días Estancado", format="%d días"),
-                        "Units_sold": st.column_config.NumberColumn("Ventas", format="%d"),
-                        "Stock_turnover": st.column_config.NumberColumn("Rotación", format="%.2fx")
-                    }
-                )
-
-            with sub_tab3:
-                if not df_filtrado.empty:
-                    idx_top = df_filtrado.groupby("Category")["Exceso_Porcentual"].idxmax()
-                    df_top_cat = df_filtrado.loc[idx_top].sort_values(by="Exceso_Porcentual", ascending=False)
-
-                    col_top = [
-                        "Category", "Product_name", "Stock", "Units_expected",
-                        "Exceso_Porcentual", "Days_inventory", "Stock_turnover", "Priority_action"
-                    ]
-                    col_top = [col for col in col_top if col in df_top_cat.columns]
-
+                with sub_tab1:
+                    # Filtramos por el umbral crítico acordado (35%) y ordenamos por exceso
+                    df_criticos = resumen_prod[resumen_prod['Avg_gap_pct'] >= UMBRAL_CRITICO].sort_values(by='Avg_gap_pct', ascending=False)
+                    
                     st.dataframe(
-                        df_top_cat[col_top],
+                        df_criticos.head(top_n),
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config={
+                            "Category": "Categoría",
+                            "Subcategory": "Subcategoría",
+                            "Product_name": "Producto",
+                            "Avg_gap_pct": st.column_config.NumberColumn("Exceso Promedio (%)", format="%.1f%%"),
+                            "Avg_stock": st.column_config.NumberColumn("Stock Prom. (Unidades)", format="%.0f"),
+                            "Total_vendido": st.column_config.NumberColumn("Ventas Acumuladas", format="%d"),
+                            "Avg_turnover": st.column_config.NumberColumn("Rotación Prom.", format="%.2fx")
+                        }
+                    )
+
+                with sub_tab2:
+                    # Ordenamos estrictamente por los días de inventario estancado
+                    df_rotacion = resumen_prod.sort_values(by='Avg_days_inv', ascending=False)
+                    
+                    st.dataframe(
+                        df_rotacion[['Category', 'Subcategory', 'Product_name', 'Avg_days_inv', 'Avg_turnover', 'Avg_stock', 'Total_vendido']].head(top_n),
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config={
+                            "Category": "Categoría",
+                            "Subcategory": "Subcategoría",
+                            "Product_name": "Producto",
+                            "Avg_days_inv": st.column_config.NumberColumn("Días Estancado Prom.", format="%.0f días"),
+                            "Avg_turnover": st.column_config.NumberColumn("Rotación Prom.", format="%.2fx"),
+                            "Avg_stock": st.column_config.NumberColumn("Stock Prom. (Unidades)", format="%.0f"),
+                            "Total_vendido": st.column_config.NumberColumn("Ventas Acumuladas", format="%d")
+                        }
+                    )
+
+                with sub_tab3:
+                    # Buscamos el producto con el mayor exceso promedio en cada categoría
+                    idx_top = resumen_prod.groupby("Category")["Avg_gap_pct"].idxmax()
+                    df_top_cat = resumen_prod.loc[idx_top].sort_values(by="Avg_gap_pct", ascending=False)
+                    
+                    st.dataframe(
+                        df_top_cat[['Category', 'Product_name', 'Avg_gap_pct', 'Avg_days_inv', 'Avg_stock', 'Total_vendido']],
                         use_container_width=True,
                         hide_index=True,
                         column_config={
                             "Category": "Categoría",
                             "Product_name": "Producto Más Crítico",
-                            "Stock": st.column_config.NumberColumn("Stock Real", format="%d"),
-                            "Units_expected": st.column_config.NumberColumn("Stock Planeado", format="%d"),
-                            "Exceso_Porcentual": st.column_config.NumberColumn("Exceso (%)", format="%.1f%%"),
-                            "Days_inventory": st.column_config.NumberColumn("Días Estancado", format="%d días"),
-                            "Stock_turnover": st.column_config.NumberColumn("Rotación", format="%.2fx"),
-                            "Priority_action": "Acción"
+                            "Avg_gap_pct": st.column_config.NumberColumn("Exceso Promedio (%)", format="%.1f%%"),
+                            "Avg_days_inv": st.column_config.NumberColumn("Días Estancado Prom.", format="%.0f días"),
+                            "Avg_stock": st.column_config.NumberColumn("Stock Prom. (Unidades)", format="%.0f"),
+                            "Total_vendido": st.column_config.NumberColumn("Ventas Acumuladas", format="%d")
                         }
                     )
-                else:
-                    st.info("No hay datos suficientes para calcular los más críticos con los filtros actuales.")
+            else:
+                st.info("No hay datos suficientes con los filtros actuales.")
