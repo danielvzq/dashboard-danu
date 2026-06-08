@@ -687,8 +687,8 @@ dashboard_html = f"""
 
     .bar-fill {{
         height: 100%;
-        background: linear-gradient(90deg, #ef4444, #991b1b);
         border-radius: 999px;
+        background: #dc2626;
     }}
 
     .product-bottom {{

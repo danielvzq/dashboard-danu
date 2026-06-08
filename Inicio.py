@@ -15,8 +15,6 @@ st.set_page_config(
 )
 
 
-
-
 # =========================
 # CSS externo + override estructural de esta página
 # =========================
@@ -31,11 +29,16 @@ st.markdown(
         :root {
             --rd-page-x: clamp(1rem, 1.9vw, 1.6rem);
             --rd-page-top: clamp(1.4rem, 2vh, 2.2rem);
-            --rd-section-gap: clamp(8px, 0.82vw, 12px);
-            --rd-kpi-chart-gap: clamp(10px, 0.9vw, 14px);
+            --rd-section-gap: 12px;
+            --rd-kpi-chart-gap: 12px;
+            --rd-fixed-row-gap: 12px;
+
             --rd-card-radius: clamp(18px, 1.55vw, 24px);
-            --rd-border: 1px solid rgba(148, 163, 184, 0.24);
-            --rd-shadow: 0 8px 22px rgba(15, 23, 42, 0.035);
+
+            /* AJUSTE PRINCIPAL: borde más visible */
+            --rd-border: 1.5px solid rgba(100, 116, 139, 0.46);
+            --rd-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+
             --rd-text: #0f172a;
             --rd-muted: #64748b;
             --rd-soft-bg: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
@@ -54,11 +57,11 @@ st.markdown(
         }
 
         div[data-testid="stVerticalBlock"] {
-            gap: clamp(0.5rem, 0.8vw, 0.75rem) !important;
+            gap: var(--rd-fixed-row-gap) !important;
         }
 
         div[data-testid="stHorizontalBlock"] {
-            gap: clamp(0.55rem, 0.85vw, 0.8rem) !important;
+            gap: var(--rd-fixed-row-gap) !important;
         }
 
         div[data-testid="column"] {
@@ -69,12 +72,14 @@ st.markdown(
             display: block;
             overflow: visible !important;
             color: var(--rd-text) !important;
-            font-size: clamp(2rem, 3.35vw, 3.25rem) !important;
+            font-size: 44px !important;
             font-weight: 950 !important;
-            letter-spacing: clamp(-1.4px, -0.12vw, -0.7px) !important;
+            letter-spacing: -1.2px !important;
             line-height: 1.16 !important;
-            margin: 0 0 clamp(1rem, 1.6vw, 1.5rem) 0 !important;
-            padding: clamp(4px, 0.45vh, 8px) 0 0 0 !important;
+            margin: 0 0 20px 0 !important;
+            padding: 6px 0 0 0 !important;
+            min-height: 58px !important;
+            white-space: normal !important;
         }
 
         div[data-testid="stMarkdownContainer"]:has(.rd-main-title),
@@ -108,28 +113,32 @@ st.markdown(
             background: var(--accent-color);
         }
 
+        .rd-top-card:hover {
+            border-color: rgba(71, 85, 105, 0.58) !important;
+        }
+
         .rd-top-title {
             display: block;
             color: var(--rd-text) !important;
-            font-size: clamp(12px, 1.02vw, 15px) !important;
+            font-size: 15px !important;
             font-weight: 950 !important;
-            line-height: 1.1 !important;
-            letter-spacing: 0 !important;
-            margin: 0 0 clamp(5px, 0.65vw, 9px) 0 !important;
+            line-height: 1.12 !important;
+            letter-spacing: -0.15px !important;
+            margin: 0 0 8px 0 !important;
         }
 
         .rd-top-value {
             display: flex !important;
             flex-wrap: wrap !important;
             align-items: baseline !important;
-            column-gap: clamp(5px, 0.45vw, 8px) !important;
+            column-gap: 7px !important;
             row-gap: 2px !important;
             color: var(--rd-text) !important;
-            font-size: clamp(27px, 2.55vw, 40px) !important;
+            font-size: 39px !important;
             font-weight: 950 !important;
-            letter-spacing: clamp(-1.35px, -0.08vw, -0.8px) !important;
-            line-height: 1 !important;
-            margin: 0 0 clamp(6px, 0.55vw, 9px) 0 !important;
+            letter-spacing: -1.15px !important;
+            line-height: 0.98 !important;
+            margin: 0 0 8px 0 !important;
             word-break: keep-all !important;
             overflow-wrap: normal !important;
         }
@@ -143,7 +152,7 @@ st.markdown(
 
         .rd-top-unit {
             color: var(--rd-text) !important;
-            font-size: clamp(12px, 0.98vw, 15px) !important;
+            font-size: 15px !important;
             font-weight: 950 !important;
             letter-spacing: -0.25px !important;
             line-height: 1.05 !important;
@@ -152,10 +161,10 @@ st.markdown(
 
         .rd-top-description {
             color: var(--rd-muted) !important;
-            font-size: clamp(10px, 0.86vw, 12.5px) !important;
+            font-size: 12px !important;
             font-weight: 750 !important;
             letter-spacing: 0 !important;
-            line-height: 1.24 !important;
+            line-height: 1.22 !important;
             margin: 0 !important;
             display: -webkit-box;
             -webkit-line-clamp: 2;
@@ -179,8 +188,10 @@ st.markdown(
         }
 
         .rd-kpi-chart-gap {
-            height: var(--rd-kpi-chart-gap) !important;
-            min-height: 10px !important;
+            height: 0 !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
         }
 
         .rd-chart-bottom-gap {
@@ -188,7 +199,22 @@ st.markdown(
             min-height: 8px !important;
         }
 
-        [data-testid="stVerticalBlockBorderWrapper"]:has(.rd-chart-anchor) {
+        div[data-testid="stElementContainer"]:has(.rd-kpi-chart-gap),
+        div[data-testid="stMarkdownContainer"]:has(.rd-kpi-chart-gap) {
+            height: 0 !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+        }
+
+        div[data-testid="stHorizontalBlock"]:has(.rd-top-card) {
+            margin-bottom: 12px !important;
+        }
+
+        /* AJUSTE IMPORTANTE:
+           aplica el borde visible a la tarjeta de la gráfica */
+        div[data-testid="stVerticalBlockBorderWrapper"] {
             box-sizing: border-box !important;
             border-radius: var(--rd-card-radius) !important;
             border: var(--rd-border) !important;
@@ -199,6 +225,10 @@ st.markdown(
             overflow: visible !important;
         }
 
+        div[data-testid="stVerticalBlockBorderWrapper"]:hover {
+            border-color: rgba(71, 85, 105, 0.58) !important;
+        }
+
         .rd-chart-header {
             padding: 0 !important;
             margin: 0 0 clamp(8px, 0.8vw, 12px) 0 !important;
@@ -206,19 +236,19 @@ st.markdown(
 
         .rd-chart-header h3 {
             color: var(--rd-text) !important;
-            font-size: clamp(14px, 1.15vw, 17px) !important;
+            font-size: 17px !important;
             font-weight: 950 !important;
             letter-spacing: -0.25px !important;
-            line-height: 1.15 !important;
+            line-height: 1.16 !important;
             margin: 0 !important;
         }
 
         .rd-chart-header p {
             color: var(--rd-muted) !important;
-            font-size: clamp(10px, 0.82vw, 12px) !important;
+            font-size: 12px !important;
             font-weight: 750 !important;
             line-height: 1.25 !important;
-            margin: clamp(6px, 0.65vw, 10px) 0 0 0 !important;
+            margin: 8px 0 0 0 !important;
         }
 
         .rd-bottom-card {
@@ -230,6 +260,10 @@ st.markdown(
             border: var(--rd-border);
             box-shadow: var(--rd-shadow);
             overflow: hidden;
+        }
+
+        .rd-bottom-card:hover {
+            border-color: rgba(71, 85, 105, 0.58) !important;
         }
 
         .rd-bottom-grid {
@@ -264,33 +298,38 @@ st.markdown(
             padding: clamp(6px, 0.55vw, 8px) clamp(8px, 0.75vw, 11px);
             text-align: center;
             background: rgba(255, 255, 255, 0.9);
-            border: 1px solid rgba(148, 163, 184, 0.24);
+            border: 1.4px solid rgba(100, 116, 139, 0.38);
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.035);
             overflow: visible;
+        }
+
+        .rd-small-kpi:hover {
+            border-color: rgba(71, 85, 105, 0.55) !important;
         }
 
         .rd-small-kpi-label {
             color: var(--rd-muted);
-            font-size: clamp(7.8px, 0.62vw, 9.2px);
+            font-size: 9px !important;
             font-weight: 950;
             text-transform: uppercase;
             white-space: nowrap;
-            line-height: 1.1;
-            margin: 0 0 clamp(3px, 0.32vw, 5px) 0;
+            line-height: 1.1 !important;
+            margin: 0 0 4px 0 !important;
         }
 
         .rd-small-kpi-value {
             color: var(--rd-text);
-            font-size: clamp(15px, 1.25vw, 19px);
+            font-size: 18px !important;
             font-weight: 950;
             letter-spacing: -0.6px;
-            line-height: 1;
+            line-height: 1 !important;
             margin: 0;
             text-align: center;
             overflow-wrap: anywhere;
         }
 
         .rd-small-kpi-value-wide {
-            font-size: clamp(17px, 1.45vw, 22px);
+            font-size: 21px !important;
         }
 
         .rd-ranking {
@@ -300,11 +339,11 @@ st.markdown(
 
         .rd-ranking-title {
             color: var(--rd-text);
-            font-size: clamp(13px, 1.05vw, 16px);
+            font-size: 16px !important;
             font-weight: 950;
-            line-height: 1.15;
+            line-height: 1.15 !important;
             letter-spacing: -0.25px;
-            margin: 0 0 clamp(6px, 0.58vw, 9px) 0;
+            margin: 0 0 8px 0 !important;
         }
 
         .rd-ranking-item {
@@ -315,12 +354,12 @@ st.markdown(
             display: flex;
             justify-content: space-between;
             align-items: center;
-            gap: clamp(8px, 0.8vw, 12px);
+            gap: 10px !important;
             color: #111827;
-            font-size: clamp(10px, 0.82vw, 12.5px);
+            font-size: 12px !important;
             font-weight: 900;
-            line-height: 1.1;
-            margin-bottom: clamp(2px, 0.25vw, 4px);
+            line-height: 1.1 !important;
+            margin-bottom: 3px !important;
         }
 
         .rd-product-name {
@@ -333,7 +372,7 @@ st.markdown(
         .rd-ranking-top strong {
             flex-shrink: 0;
             color: #dc2626;
-            font-size: clamp(12px, 0.98vw, 15px);
+            font-size: 14px !important;
             font-weight: 950;
             white-space: nowrap;
         }
@@ -351,12 +390,13 @@ st.markdown(
             border-radius: 999px;
             background: #dc2626;
         }
+
         .rd-footer {
             color: #94a3b8;
-            font-size: clamp(10px, 0.78vw, 12px);
+            font-size: 11px !important;
             font-weight: 800;
-            line-height: 1.15;
-            margin: clamp(5px, 0.5vw, 8px) 0 0 0;
+            line-height: 1.15 !important;
+            margin: 7px 0 0 0 !important;
         }
 
         .rd-small-kpi::after {
@@ -397,40 +437,22 @@ st.markdown(
             top: calc(100% - 1px);
             border-bottom-color: var(--rd-text);
         }
+
         .rd-tooltip-top::after { bottom: calc(100% + 8px); }
         .rd-tooltip-top::before {
             bottom: calc(100% - 1px);
             border-top-color: var(--rd-text);
         }
+
         .rd-small-kpi:hover::after,
         .rd-small-kpi:hover::before { opacity: 1; }
-        .rd-small-kpi:hover::after { transform: translateX(-50%) translateY(-2px); }
+
+        .rd-small-kpi:hover::after {
+            transform: translateX(-50%) translateY(-2px);
+        }
 
         div[data-testid="stPlotlyChart"] {
             margin-top: clamp(-2px, -0.12vw, 0px) !important;
-        }
-
-        @media (max-width: 1180px) {
-            .rd-top-card {
-                min-height: clamp(112px, 13vw, 142px) !important;
-                padding: clamp(12px, 1.25vw, 18px) clamp(10px, 1.25vw, 18px);
-            }
-
-            .rd-top-title {
-                font-size: clamp(10px, 1.35vw, 13px) !important;
-            }
-
-            .rd-top-value {
-                font-size: clamp(20px, 3vw, 31px) !important;
-            }
-
-            .rd-top-unit {
-                font-size: clamp(10px, 1.25vw, 13px) !important;
-            }
-
-            .rd-top-description {
-                font-size: clamp(8.5px, 1.15vw, 11px) !important;
-            }
         }
 
         @media (max-width: 1100px) {
@@ -447,195 +469,18 @@ st.markdown(
             }
 
             .rd-main-title {
-                font-size: clamp(1.7rem, 8vw, 2.35rem) !important;
-                line-height: 1.16 !important;
-                margin-bottom: 0.85rem !important;
-                padding-top: 0.2rem !important;
-            }
-
-            .rd-top-card {
-                min-height: 112px !important;
-            }
-
-            .rd-top-value {
-                font-size: clamp(21px, 7vw, 30px) !important;
-            }
-
-            .rd-top-unit {
-                font-size: clamp(10px, 3.2vw, 13px) !important;
-            }
-        }
-
-
-        /* =====================================================
-           BLOQUEO DE TIPOGRAFÍA
-           Mantiene tamaños de letra fijos como en Inventario.
-           El responsive queda en contenedores/espaciados, no en fuentes.
-        ===================================================== */
-        .rd-main-title {
-            font-size: 44px !important;
-            line-height: 1.16 !important;
-            letter-spacing: -1.2px !important;
-            margin: 0 0 20px 0 !important;
-            padding: 6px 0 0 0 !important;
-            min-height: 58px !important;
-            overflow: visible !important;
-            white-space: normal !important;
-        }
-
-        .rd-top-title {
-            font-size: 15px !important;
-            line-height: 1.12 !important;
-            letter-spacing: -0.15px !important;
-            margin: 0 0 8px 0 !important;
-        }
-
-        .rd-top-value {
-            font-size: 39px !important;
-            line-height: 0.98 !important;
-            letter-spacing: -1.15px !important;
-            margin: 0 0 8px 0 !important;
-            column-gap: 7px !important;
-        }
-
-        .rd-top-unit {
-            font-size: 15px !important;
-            line-height: 1.05 !important;
-            letter-spacing: -0.25px !important;
-        }
-
-        .rd-top-description {
-            font-size: 12px !important;
-            line-height: 1.22 !important;
-            letter-spacing: 0 !important;
-        }
-
-        .rd-chart-header h3 {
-            font-size: 17px !important;
-            line-height: 1.16 !important;
-            letter-spacing: -0.25px !important;
-        }
-
-        .rd-chart-header p {
-            font-size: 12px !important;
-            line-height: 1.25 !important;
-            margin: 8px 0 0 0 !important;
-        }
-
-        .rd-small-kpi-label {
-            font-size: 9px !important;
-            line-height: 1.1 !important;
-            margin: 0 0 4px 0 !important;
-        }
-
-        .rd-small-kpi-value {
-            font-size: 18px !important;
-            line-height: 1 !important;
-        }
-
-        .rd-small-kpi-value-wide {
-            font-size: 21px !important;
-        }
-
-        .rd-ranking-title {
-            font-size: 16px !important;
-            line-height: 1.15 !important;
-            margin: 0 0 8px 0 !important;
-        }
-
-        .rd-ranking-top {
-            font-size: 12px !important;
-            line-height: 1.1 !important;
-            margin-bottom: 3px !important;
-            gap: 10px !important;
-        }
-
-        .rd-ranking-top strong {
-            font-size: 14px !important;
-            line-height: 1.1 !important;
-        }
-
-        .rd-footer {
-            font-size: 11px !important;
-            line-height: 1.15 !important;
-            margin: 7px 0 0 0 !important;
-        }
-
-        /* En pantallas menores, solo se compacta estructura; las fuentes no cambian. */
-        @media (max-width: 1180px) {
-            .rd-main-title { font-size: 44px !important; }
-            .rd-top-title { font-size: 15px !important; }
-            .rd-top-value { font-size: 39px !important; }
-            .rd-top-unit { font-size: 15px !important; }
-            .rd-top-description { font-size: 12px !important; }
-            .rd-chart-header h3 { font-size: 17px !important; }
-            .rd-chart-header p { font-size: 12px !important; }
-        }
-
-        @media (max-width: 760px) {
-            .rd-main-title {
                 font-size: 44px !important;
                 line-height: 1.16 !important;
                 min-height: 58px !important;
                 margin-bottom: 20px !important;
                 padding-top: 6px !important;
             }
+
             .rd-top-title { font-size: 15px !important; }
             .rd-top-value { font-size: 39px !important; }
             .rd-top-unit { font-size: 15px !important; }
             .rd-top-description { font-size: 12px !important; }
         }
-
-
-        /* =====================================================
-           BLOQUEO DE ESPACIADO ENTRE KPIs Y GRÁFICA
-           Evita que el gap se comprima al cambiar el ancho.
-        ===================================================== */
-        :root {
-            --rd-fixed-row-gap: 12px;
-            --rd-kpi-chart-gap: 12px;
-            --rd-section-gap: 12px;
-        }
-
-        /* Deja el gap base de Streamlit fijo, no dependiente del viewport. */
-        div[data-testid="stVerticalBlock"] {
-            gap: var(--rd-fixed-row-gap) !important;
-        }
-
-        div[data-testid="stHorizontalBlock"] {
-            gap: var(--rd-fixed-row-gap) !important;
-        }
-
-        /* Fila de KPIs: separación constante antes de la gráfica. */
-        div[data-testid="stHorizontalBlock"]:has(.rd-top-card) {
-            margin-bottom: 12px !important;
-        }
-
-        /* El separador manual ya no depende de clamp/vw. */
-        .rd-kpi-chart-gap {
-            display: block !important;
-            height: 0 !important;
-            min-height: 0 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            line-height: 0 !important;
-            overflow: hidden !important;
-        }
-
-        div[data-testid="stElementContainer"]:has(.rd-kpi-chart-gap),
-        div[data-testid="stMarkdownContainer"]:has(.rd-kpi-chart-gap) {
-            height: 0 !important;
-            min-height: 0 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            overflow: hidden !important;
-        }
-
-        /* La tarjeta de la gráfica conserva su borde sin pegarse a los KPIs. */
-        [data-testid="stVerticalBlockBorderWrapper"]:has(.rd-chart-anchor) {
-            margin-top: 0 !important;
-        }
-
     </style>
     """,
     unsafe_allow_html=True
@@ -746,13 +591,11 @@ with st.sidebar:
     # =========================
     df_subcategorias = df_maestra.copy()
 
-    # Respeta la región seleccionada
     if region != "Todas":
         df_subcategorias = df_subcategorias[
             df_subcategorias["Region"] == region
         ]
 
-    # Respeta la categoría seleccionada
     if categoria != "Todas":
         df_subcategorias = df_subcategorias[
             df_subcategorias["Category"] == categoria
@@ -769,12 +612,14 @@ with st.sidebar:
         "Subcategoría",
         ["Todas"] + subcategorias
     )
+
     acciones = sorted(df_maestra["Priority_action"].dropna().unique().tolist())
     acciones_seleccionadas = st.multiselect(
         "Acción prioritaria",
         acciones,
         default=acciones
     )
+
 
 # =========================
 # Aplicar filtros
@@ -913,15 +758,13 @@ with col3:
         unsafe_allow_html=True
     )
 
-# Separación explícita entre KPIs y gráfica.
-# No depende del padding de columnas ni de :has(), por eso es más estable.
 st.markdown('<div class="rd-kpi-chart-gap" aria-hidden="true">&nbsp;</div>', unsafe_allow_html=True)
+
 
 # =========================
 # Card: Ventas mensuales vs stock total
 # =========================
 with st.container(border=True):
-
     st.markdown('<div class="rd-chart-anchor" aria-hidden="true"></div>', unsafe_allow_html=True)
 
     st.markdown("""
@@ -933,9 +776,6 @@ with st.container(border=True):
     </div>
     """, unsafe_allow_html=True)
 
-    # =========================
-    # Datos para gráfica
-    # =========================
     df_mes = df_filtrado.copy()
     df_mes["Mes"] = df_mes["Date"].dt.to_period("M").dt.to_timestamp()
 
@@ -1007,8 +847,8 @@ with st.container(border=True):
         config={"displayModeBar": False}
     )
 
-# Separación explícita entre gráfica y panel inferior.
 st.markdown('<div class="rd-chart-bottom-gap" aria-hidden="true">&nbsp;</div>', unsafe_allow_html=True)
+
 
 # =========================
 # Datos para panel lateral
@@ -1035,6 +875,7 @@ if sell_through_rate <= 1:
     sell_through_rate = sell_through_rate * 100
 
 ventas_unidades_totales = df_cards["Units_sold"].sum()
+
 
 # =========================
 # Top 5 productos con mayor sobrestock
@@ -1083,10 +924,10 @@ for _, row in top5_sobrestock.iterrows():
         f'</div>'
     )
 
+
 # =========================
 # Panel lateral compacto
 # =========================
-# Importante: se arma sin indentación tipo Markdown para que Streamlit no lo interprete como bloque de código.
 side_panel_html = (
     f'<div class="rd-bottom-card">'
     f'<div class="rd-bottom-grid">'
