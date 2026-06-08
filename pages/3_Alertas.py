@@ -933,8 +933,8 @@ else:
 
                 fig_tree.update_layout(
                     autosize=True,
-                    margin=dict(t=25, l=10, r=10, b=10),
-                    height=360,
+                    margin=dict(t=20, l=10, r=10, b=20),
+                    height=330,
                     paper_bgcolor="rgba(0,0,0,0)"
                 )
 
@@ -1037,7 +1037,7 @@ else:
                         y=df_tiempo["Units_sold"],
                         name="Unidades Vendidas",
                         mode="lines+markers",
-                        line=dict(color="#10b981", width=2, dash="dot"),
+                        line=dict(color="#2563eb", width=2, dash="dot"),
                         marker=dict(size=5),
                         hovertemplate="%{x|%b %Y}<br>Ventas: %{y:,.0f} uds<extra></extra>"
                     ))

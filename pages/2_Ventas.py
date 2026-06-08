@@ -4,6 +4,7 @@ from html import escape
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 import plotly.express as px
 
 
@@ -200,20 +201,27 @@ def cargar_datos():
     df_maestra.columns = df_maestra.columns.str.strip()
     df_maestra["Date"] = pd.to_datetime(df_maestra["Date"], errors="coerce")
 
-    if "Percentage" in df_maestra.columns:
-        df_maestra["Exceso_Porcentual"] = df_maestra["Percentage"] - 100.0
-
-    df_maestra["Sales_amount"] = (
-        pd.to_numeric(df_maestra["Sales_amount"], errors="coerce")
-        .fillna(0)
-        .round(0)
-        .astype(int)
-    )
+    # ---------------------------------------------------------
+    # CORRECCIÓN MATEMÁTICA (Alineada al Notebook)
+    # ---------------------------------------------------------
+    for col in ["Stock", "Units_sold", "Static_price", "Sales_amount"]:
+        if col in df_maestra.columns:
+            df_maestra[col] = pd.to_numeric(df_maestra[col], errors="coerce").fillna(0)
+            
+    if "Stock" in df_maestra.columns and "Units_sold" in df_maestra.columns:
+        df_maestra["Excess_stock"] = (df_maestra["Stock"] - df_maestra["Units_sold"]).clip(lower=0)
+        df_maestra["Gap_pct"] = (df_maestra["Excess_stock"] / df_maestra["Stock"].replace(0, np.nan)) * 100
+        df_maestra["Exceso_Porcentual"] = df_maestra["Gap_pct"].fillna(0)
+    
+    df_maestra["Sales_amount"] = df_maestra["Sales_amount"].round(0).astype(int)
 
     for col in ["Region", "Category", "Subcategory"]:
         if col in df_maestra.columns:
             df_maestra[col] = df_maestra[col].astype(str).str.strip().str.title()
 
+    # ---------------------------------------------------------
+    # CARGA DE TABLAS ADICIONALES Y ESTANDARIZACIÓN DE COLUMNAS
+    # ---------------------------------------------------------
     df_ventas = pd.read_csv("data/ventas_limpio.csv")
     df_clientes = pd.read_csv("data/clientes_limpio.csv")
     df_productos = pd.read_csv("data/productos_limpio.csv")
@@ -221,16 +229,31 @@ def cargar_datos():
     for dataframe in [df_ventas, df_clientes, df_productos]:
         dataframe.columns = dataframe.columns.str.strip()
 
+    # Estandarización robusta para evitar KeyErrors con los nombres de los CSVs brutos
+    map_ventas = {"date": "Date", "client_id": "Client_id", "product_id": "Product_id", "region": "Region", "units_sold": "Units_sold", "sales_amount": "Sales_amount"}
+    df_ventas = df_ventas.rename(columns=lambda x: map_ventas.get(x.lower(), x))
+
+    map_clientes = {"cliente_id": "Client_ID", "ticket_promedio": "Average_Ticket"}
+    df_clientes = df_clientes.rename(columns=lambda x: map_clientes.get(x.lower(), x))
+
+    map_prod = {"product_id": "Product_id", "product_name": "Product_name", "category": "Category", "subcategory": "Subcategory", "static_price": "Static_price"}
+    df_productos = df_productos.rename(columns=lambda x: map_prod.get(x.lower(), x))
+
+    # Limpieza de fechas
     if "Date" in df_ventas.columns:
         df_ventas["Date"] = pd.to_datetime(df_ventas["Date"], errors="coerce")
 
-    df_clientes["Segmento_Cliente"] = pd.qcut(
-        df_clientes["Average_Ticket"],
-        q=3,
-        labels=["Ticket Bajo", "Ticket Medio", "Ticket Alto"],
-        duplicates="drop"
-    )
+    # Segmentación basada en el Ticket Promedio
+    if "Average_Ticket" in df_clientes.columns:
+        df_clientes["Segmento_Cliente"] = pd.qcut(
+            pd.to_numeric(df_clientes["Average_Ticket"], errors="coerce"),
+            q=3,
+            labels=["Ticket Bajo", "Ticket Medio", "Ticket Alto"],
+            duplicates="drop"
+        )
+        df_clientes["Segmento_Cliente"] = df_clientes["Segmento_Cliente"].astype(str).replace("nan", "Desconocido")
 
+    # Generar tabla unificada (Ventas + Clientes + Productos)
     df_cv = pd.merge(
         df_ventas,
         df_clientes,
@@ -248,7 +271,7 @@ def cargar_datos():
             .astype(int)
         )
 
-    for col in ["Region", "Category", "Subcategory"]:
+    for col in ["Region", "Category", "Subcategory", "Segmento_Cliente"]:
         if col in df_cv.columns:
             df_cv[col] = df_cv[col].astype(str).str.strip().str.title()
 
@@ -292,8 +315,10 @@ with st.sidebar:
 
     st.markdown("### Filtros")
 
-    fecha_min = df_base["Date"].min().date()
-    fecha_max = df_base["Date"].max().date()
+    # Asegurar fechas válidas para los filtros
+    fechas_validas = df_base["Date"].dropna()
+    fecha_min = fechas_validas.min().date() if not fechas_validas.empty else pd.Timestamp("2024-01-01").date()
+    fecha_max = fechas_validas.max().date() if not fechas_validas.empty else pd.Timestamp("2025-12-31").date()
 
     rango_fechas = st.date_input(
         "Rango de fechas",
@@ -313,7 +338,9 @@ with st.sidebar:
 
     if isinstance(rango_fechas, tuple) and len(rango_fechas) == 2:
         fecha_inicio, fecha_fin = rango_fechas
+        mask_fechas = df_subcategorias["Date"].notna()
         df_subcategorias = df_subcategorias[
+            mask_fechas &
             (df_subcategorias["Date"].dt.date >= fecha_inicio) &
             (df_subcategorias["Date"].dt.date <= fecha_fin)
         ]
@@ -327,10 +354,6 @@ with st.sidebar:
     subcategorias = sorted(df_subcategorias["Subcategory"].dropna().unique().tolist())
     subcategoria_sel = st.selectbox("Subcategoría", ["Todas"] + subcategorias)
 
-    st.divider()
-    st.markdown("### Configuración")
-    top_n = st.slider("Cantidad de productos (Top N)", min_value=1, max_value=50, value=10, step=1)
-
 
 # =========================
 # Aplicar filtros
@@ -340,13 +363,20 @@ df_filtrado_cv = df_cv.copy()
 
 if isinstance(rango_fechas, tuple) and len(rango_fechas) == 2:
     fecha_inicio, fecha_fin = rango_fechas
+    
+    # Filtrar Maestra evadiendo NaT
+    mask_maestra = df_filtrado_maestra["Date"].notna()
     df_filtrado_maestra = df_filtrado_maestra[
+        mask_maestra &
         (df_filtrado_maestra["Date"].dt.date >= fecha_inicio) &
         (df_filtrado_maestra["Date"].dt.date <= fecha_fin)
     ]
 
+    # Filtrar CV evadiendo NaT
     if "Date" in df_filtrado_cv.columns:
+        mask_cv = df_filtrado_cv["Date"].notna()
         df_filtrado_cv = df_filtrado_cv[
+            mask_cv &
             (df_filtrado_cv["Date"].dt.date >= fecha_inicio) &
             (df_filtrado_cv["Date"].dt.date <= fecha_fin)
         ]
@@ -460,7 +490,7 @@ with tab1:
             if not df_filtrado_cv.empty:
                 df_perfiles = (
                     df_filtrado_cv
-                    .groupby(["Segmento_Cliente", "Category"], observed=False)["Sales_amount"]
+                    .groupby(["Segmento_Cliente", "Category"])["Sales_amount"]
                     .sum()
                     .reset_index()
                 )
@@ -477,7 +507,7 @@ with tab1:
 
                 fig_bar.update_layout(
                     autosize=True,
-                    height=330,
+                    height=310,
                     margin=dict(t=10, l=10, r=10, b=10),
                     paper_bgcolor="rgba(0,0,0,0)",
                     plot_bgcolor="rgba(0,0,0,0)",
@@ -503,7 +533,7 @@ with tab1:
             if not df_filtrado_cv.empty:
                 df_geo = (
                     df_filtrado_cv
-                    .groupby(["Region", "Segmento_Cliente"], observed=False)["Sales_amount"]
+                    .groupby(["Region", "Segmento_Cliente"])["Sales_amount"]
                     .sum()
                     .reset_index()
                 )
@@ -518,7 +548,8 @@ with tab1:
                 colores_segmento = {
                     "Ticket Bajo": "#3b82f6",
                     "Ticket Medio": "#10b981",
-                    "Ticket Alto": "#f59e0b"
+                    "Ticket Alto": "#f59e0b",
+                    "Desconocido": "#94a3b8"
                 }
 
                 fig_geo = px.bar(
@@ -534,7 +565,7 @@ with tab1:
 
                 fig_geo.update_layout(
                     autosize=True,
-                    height=330,
+                    height=310,
                     margin=dict(t=10, l=10, r=10, b=10),
                     paper_bgcolor="rgba(0,0,0,0)",
                     plot_bgcolor="rgba(0,0,0,0)",
@@ -578,7 +609,7 @@ with tab2:
             fig_line.update_traces(hovertemplate="<b>%{data.name}</b><br>Ventas: $%{y:,.0f}<extra></extra>")
             fig_line.update_layout(
                 autosize=True,
-                height=350,
+                height=310,
                 margin=dict(t=10, l=10, r=10, b=10),
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
