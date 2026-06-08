@@ -32,8 +32,10 @@ def load_data() -> pd.DataFrame:
     Columnas añadidas
     -----------------
     YearMonth       : período mensual (Period)
-    Excess_stock    : unidades sobrantes = max(Stock - Units_sold, 0)
-    Gap_units       : Stock - Units_sold  (puede ser negativo)
+    Excess_stock    : unidades sobrantes vs demanda planeada = max(Stock - Units_expected, 0)
+                      (se usa Units_expected en lugar de Units_sold para comparar contra
+                      lo planeado, no contra lo real; si la columna no existe, cae a Units_sold)
+    Gap_units       : Stock - Units_expected  (puede ser negativo = faltante)
     Gap_pct         : Gap_units / Stock × 100
     """
     df = pd.read_csv(
@@ -45,11 +47,15 @@ def load_data() -> pd.DataFrame:
 
     df["YearMonth"] = df["Date"].dt.to_period("M")
 
+    # CORRECCIÓN: comparar contra demanda planeada (Units_expected), no ventas reales.
+    # Así el exceso refleja inventario no planeado, no simple diferencia de movimiento.
+    demand_col = "Units_expected" if "Units_expected" in df.columns else "Units_sold"
+
     df["Excess_stock"] = (
-        df["Stock"] - df["Units_sold"]
+        df["Stock"] - df[demand_col]
     ).clip(lower=0)
 
-    df["Gap_units"] = df["Stock"] - df["Units_sold"]
+    df["Gap_units"] = df["Stock"] - df[demand_col]
 
     df["Gap_pct"] = (
         df["Gap_units"] / df["Stock"].replace(0, np.nan)
@@ -109,11 +115,15 @@ def fit_prophet(
         weekly_seasonality=False,
         daily_seasonality=False,
     )
-    model.add_seasonality(
-        name="semestral",               # igual al notebook
-        period=182.5,
-        fourier_order=3,                # igual al notebook
-    )
+    # Estacionalidad semestral: fourier_order=1 con 12 meses (2 ciclos semestrales).
+    # fourier_order=3 agrega 6 parámetros para solo 12 puntos → riesgo de sobreajuste.
+    # Con >= 24 meses se puede aumentar a fourier_order=3 de forma segura.
+    if len(sub) >= 12:
+        model.add_seasonality(
+            name="semestral",
+            period=182.5,
+            fourier_order=1 if len(sub) < 24 else 3,
+        )
 
     model.fit(sub)
 
@@ -245,11 +255,13 @@ def build_region_forecast(horizon: int) -> pd.DataFrame:
             weekly_seasonality=False,
             daily_seasonality=False,
         )
-        model.add_seasonality(
-            name="semestral",               # igual al notebook
-            period=182.5,
-            fourier_order=3,               # igual al notebook
-        )
+        # Mismo criterio que fit_prophet — fourier_order adaptativo según historia.
+        if len(sub) >= 12:
+            model.add_seasonality(
+                name="semestral",
+                period=182.5,
+                fourier_order=1 if len(sub) < 24 else 3,
+            )
         model.fit(sub)
 
         future   = model.make_future_dataframe(periods=horizon, freq="MS")
