@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 from html import escape
 import pandas as pd
 import plotly.graph_objects as go
@@ -16,59 +15,632 @@ st.set_page_config(
 )
 
 
+
+
 # =========================
-# CSS general compacto
+# CSS externo + override estructural de esta página
 # =========================
+css_path = Path("styles/main.css")
+if css_path.exists():
+    with open(css_path, encoding="utf-8") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
 st.markdown(
     """
     <style>
+        :root {
+            --rd-page-x: clamp(1rem, 1.9vw, 1.6rem);
+            --rd-page-top: clamp(1.4rem, 2vh, 2.2rem);
+            --rd-section-gap: clamp(8px, 0.82vw, 12px);
+            --rd-kpi-chart-gap: clamp(10px, 0.9vw, 14px);
+            --rd-card-radius: clamp(18px, 1.55vw, 24px);
+            --rd-border: 1px solid rgba(148, 163, 184, 0.24);
+            --rd-shadow: 0 8px 22px rgba(15, 23, 42, 0.035);
+            --rd-text: #0f172a;
+            --rd-muted: #64748b;
+            --rd-soft-bg: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        }
+
         .block-container {
-            padding-top: 2.2rem !important;
-            padding-bottom: 0.8rem !important;
-            padding-left: 1.4rem !important;
-            padding-right: 1.4rem !important;
             max-width: 100% !important;
+            padding-top: var(--rd-page-top) !important;
+            padding-bottom: clamp(0.8rem, 1.4vh, 1.2rem) !important;
+            padding-left: var(--rd-page-x) !important;
+            padding-right: var(--rd-page-x) !important;
         }
 
         h1, h2, h3 {
             margin-top: 0 !important;
-            margin-bottom: 0.6rem !important;
-        }
-
-        .main-title {
-            color: white;
-            font-size: 30px;
-            font-weight: 950;
-            letter-spacing: -0.8px;
-            margin: 0 0 16px 0;
-            line-height: 1.2;
         }
 
         div[data-testid="stVerticalBlock"] {
-            gap: 0.65rem !important;
+            gap: clamp(0.5rem, 0.8vw, 0.75rem) !important;
         }
 
         div[data-testid="stHorizontalBlock"] {
-            gap: 0.8rem !important;
+            gap: clamp(0.55rem, 0.85vw, 0.8rem) !important;
         }
 
-        iframe {
-            display: block;
+        div[data-testid="column"] {
+            min-width: 0 !important;
         }
+
+        .rd-main-title {
+            display: block;
+            overflow: visible !important;
+            color: var(--rd-text) !important;
+            font-size: clamp(2rem, 3.35vw, 3.25rem) !important;
+            font-weight: 950 !important;
+            letter-spacing: clamp(-1.4px, -0.12vw, -0.7px) !important;
+            line-height: 1.16 !important;
+            margin: 0 0 clamp(1rem, 1.6vw, 1.5rem) 0 !important;
+            padding: clamp(4px, 0.45vh, 8px) 0 0 0 !important;
+        }
+
+        div[data-testid="stMarkdownContainer"]:has(.rd-main-title),
+        div[data-testid="stMarkdownContainer"]:has(.rd-main-title) * {
+            overflow: visible !important;
+        }
+
+        .rd-top-card {
+            --accent-color: #2563eb;
+            position: relative;
+            box-sizing: border-box;
+            width: 100%;
+            min-height: clamp(112px, 12vw, 142px) !important;
+            height: 100%;
+            overflow: hidden;
+            border-radius: var(--rd-card-radius);
+            padding: clamp(14px, 1.35vw, 22px) clamp(14px, 1.45vw, 22px) clamp(12px, 1.05vw, 18px);
+            background: var(--rd-soft-bg);
+            border: var(--rd-border);
+            box-shadow: var(--rd-shadow);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .rd-top-card::before {
+            content: "";
+            position: absolute;
+            inset: 0 0 auto 0;
+            height: clamp(5px, 0.45vw, 7px);
+            background: var(--accent-color);
+        }
+
+        .rd-top-title {
+            display: block;
+            color: var(--rd-text) !important;
+            font-size: clamp(12px, 1.02vw, 15px) !important;
+            font-weight: 950 !important;
+            line-height: 1.1 !important;
+            letter-spacing: 0 !important;
+            margin: 0 0 clamp(5px, 0.65vw, 9px) 0 !important;
+        }
+
+        .rd-top-value {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            align-items: baseline !important;
+            column-gap: clamp(5px, 0.45vw, 8px) !important;
+            row-gap: 2px !important;
+            color: var(--rd-text) !important;
+            font-size: clamp(27px, 2.55vw, 40px) !important;
+            font-weight: 950 !important;
+            letter-spacing: clamp(-1.35px, -0.08vw, -0.8px) !important;
+            line-height: 1 !important;
+            margin: 0 0 clamp(6px, 0.55vw, 9px) 0 !important;
+            word-break: keep-all !important;
+            overflow-wrap: normal !important;
+        }
+
+        .rd-top-number {
+            white-space: nowrap !important;
+            min-width: 0 !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+
+        .rd-top-unit {
+            color: var(--rd-text) !important;
+            font-size: clamp(12px, 0.98vw, 15px) !important;
+            font-weight: 950 !important;
+            letter-spacing: -0.25px !important;
+            line-height: 1.05 !important;
+            white-space: nowrap !important;
+        }
+
+        .rd-top-description {
+            color: var(--rd-muted) !important;
+            font-size: clamp(10px, 0.86vw, 12.5px) !important;
+            font-weight: 750 !important;
+            letter-spacing: 0 !important;
+            line-height: 1.24 !important;
+            margin: 0 !important;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .rd-chart-anchor {
+            display: none !important;
+        }
+
+        .rd-kpi-chart-gap,
+        .rd-chart-bottom-gap {
+            display: block !important;
+            clear: both !important;
+            width: 100% !important;
+            line-height: 0 !important;
+            font-size: 0 !important;
+            overflow: hidden !important;
+            pointer-events: none !important;
+        }
+
+        .rd-kpi-chart-gap {
+            height: var(--rd-kpi-chart-gap) !important;
+            min-height: 10px !important;
+        }
+
+        .rd-chart-bottom-gap {
+            height: var(--rd-section-gap) !important;
+            min-height: 8px !important;
+        }
+
+        [data-testid="stVerticalBlockBorderWrapper"]:has(.rd-chart-anchor) {
+            box-sizing: border-box !important;
+            border-radius: var(--rd-card-radius) !important;
+            border: var(--rd-border) !important;
+            background: var(--rd-soft-bg) !important;
+            box-shadow: var(--rd-shadow) !important;
+            padding: clamp(13px, 1.18vw, 18px) clamp(16px, 1.45vw, 22px) !important;
+            margin: 0 !important;
+            overflow: visible !important;
+        }
+
+        .rd-chart-header {
+            padding: 0 !important;
+            margin: 0 0 clamp(8px, 0.8vw, 12px) 0 !important;
+        }
+
+        .rd-chart-header h3 {
+            color: var(--rd-text) !important;
+            font-size: clamp(14px, 1.15vw, 17px) !important;
+            font-weight: 950 !important;
+            letter-spacing: -0.25px !important;
+            line-height: 1.15 !important;
+            margin: 0 !important;
+        }
+
+        .rd-chart-header p {
+            color: var(--rd-muted) !important;
+            font-size: clamp(10px, 0.82vw, 12px) !important;
+            font-weight: 750 !important;
+            line-height: 1.25 !important;
+            margin: clamp(6px, 0.65vw, 10px) 0 0 0 !important;
+        }
+
+        .rd-bottom-card {
+            box-sizing: border-box;
+            width: 100%;
+            border-radius: var(--rd-card-radius);
+            padding: clamp(10px, 0.95vw, 14px) clamp(12px, 1.1vw, 16px);
+            background: var(--rd-soft-bg);
+            border: var(--rd-border);
+            box-shadow: var(--rd-shadow);
+            overflow: hidden;
+        }
+
+        .rd-bottom-grid {
+            display: grid;
+            grid-template-columns: minmax(220px, 0.72fr) minmax(420px, 1.38fr);
+            gap: clamp(8px, 0.82vw, 12px);
+            align-items: stretch;
+            width: 100%;
+        }
+
+        .rd-small-kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: clamp(8px, 0.75vw, 10px);
+            width: 100%;
+        }
+
+        .rd-small-kpi-wide {
+            grid-column: 1 / span 2;
+        }
+
+        .rd-small-kpi {
+            position: relative;
+            cursor: help;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-width: 0;
+            min-height: clamp(42px, 3.7vw, 54px);
+            border-radius: clamp(12px, 1vw, 15px);
+            padding: clamp(6px, 0.55vw, 8px) clamp(8px, 0.75vw, 11px);
+            text-align: center;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            overflow: visible;
+        }
+
+        .rd-small-kpi-label {
+            color: var(--rd-muted);
+            font-size: clamp(7.8px, 0.62vw, 9.2px);
+            font-weight: 950;
+            text-transform: uppercase;
+            white-space: nowrap;
+            line-height: 1.1;
+            margin: 0 0 clamp(3px, 0.32vw, 5px) 0;
+        }
+
+        .rd-small-kpi-value {
+            color: var(--rd-text);
+            font-size: clamp(15px, 1.25vw, 19px);
+            font-weight: 950;
+            letter-spacing: -0.6px;
+            line-height: 1;
+            margin: 0;
+            text-align: center;
+            overflow-wrap: anywhere;
+        }
+
+        .rd-small-kpi-value-wide {
+            font-size: clamp(17px, 1.45vw, 22px);
+        }
+
+        .rd-ranking {
+            width: 100%;
+            min-width: 0;
+        }
+
+        .rd-ranking-title {
+            color: var(--rd-text);
+            font-size: clamp(13px, 1.05vw, 16px);
+            font-weight: 950;
+            line-height: 1.15;
+            letter-spacing: -0.25px;
+            margin: 0 0 clamp(6px, 0.58vw, 9px) 0;
+        }
+
+        .rd-ranking-item {
+            margin-bottom: clamp(4px, 0.46vw, 7px);
+        }
+
+        .rd-ranking-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: clamp(8px, 0.8vw, 12px);
+            color: #111827;
+            font-size: clamp(10px, 0.82vw, 12.5px);
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: clamp(2px, 0.25vw, 4px);
+        }
+
+        .rd-product-name {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .rd-ranking-top strong {
+            flex-shrink: 0;
+            color: #dc2626;
+            font-size: clamp(12px, 0.98vw, 15px);
+            font-weight: 950;
+            white-space: nowrap;
+        }
+
+        .rd-bar-track {
+            width: 100%;
+            height: clamp(5px, 0.44vw, 7px);
+            overflow: hidden;
+            border-radius: 999px;
+            background: #fee2e2;
+        }
+
+        .rd-bar-fill {
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #ef4444, #991b1b);
+        }
+
+        .rd-footer {
+            color: #94a3b8;
+            font-size: clamp(10px, 0.78vw, 12px);
+            font-weight: 800;
+            line-height: 1.15;
+            margin: clamp(5px, 0.5vw, 8px) 0 0 0;
+        }
+
+        .rd-small-kpi::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: max-content;
+            max-width: min(230px, 80vw);
+            z-index: 999;
+            opacity: 0;
+            pointer-events: none;
+            border-radius: 10px;
+            padding: 8px 10px;
+            text-align: center;
+            color: #ffffff;
+            background: var(--rd-text);
+            box-shadow: 0 10px 25px rgba(15, 23, 42, 0.22);
+            font-size: 10px;
+            font-weight: 650;
+            line-height: 1.3;
+            transition: opacity 0.18s ease, transform 0.18s ease;
+        }
+
+        .rd-small-kpi::before {
+            content: "";
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 999;
+            opacity: 0;
+            border: 6px solid transparent;
+            transition: opacity 0.18s ease;
+        }
+
+        .rd-tooltip-bottom::after { top: calc(100% + 8px); }
+        .rd-tooltip-bottom::before {
+            top: calc(100% - 1px);
+            border-bottom-color: var(--rd-text);
+        }
+        .rd-tooltip-top::after { bottom: calc(100% + 8px); }
+        .rd-tooltip-top::before {
+            bottom: calc(100% - 1px);
+            border-top-color: var(--rd-text);
+        }
+        .rd-small-kpi:hover::after,
+        .rd-small-kpi:hover::before { opacity: 1; }
+        .rd-small-kpi:hover::after { transform: translateX(-50%) translateY(-2px); }
+
+        div[data-testid="stPlotlyChart"] {
+            margin-top: clamp(-2px, -0.12vw, 0px) !important;
+        }
+
+        @media (max-width: 1180px) {
+            .rd-top-card {
+                min-height: clamp(112px, 13vw, 142px) !important;
+                padding: clamp(12px, 1.25vw, 18px) clamp(10px, 1.25vw, 18px);
+            }
+
+            .rd-top-title {
+                font-size: clamp(10px, 1.35vw, 13px) !important;
+            }
+
+            .rd-top-value {
+                font-size: clamp(20px, 3vw, 31px) !important;
+            }
+
+            .rd-top-unit {
+                font-size: clamp(10px, 1.25vw, 13px) !important;
+            }
+
+            .rd-top-description {
+                font-size: clamp(8.5px, 1.15vw, 11px) !important;
+            }
+        }
+
+        @media (max-width: 1100px) {
+            .rd-bottom-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .block-container {
+                padding-left: 0.75rem !important;
+                padding-right: 0.75rem !important;
+                padding-top: 1rem !important;
+            }
+
+            .rd-main-title {
+                font-size: clamp(1.7rem, 8vw, 2.35rem) !important;
+                line-height: 1.16 !important;
+                margin-bottom: 0.85rem !important;
+                padding-top: 0.2rem !important;
+            }
+
+            .rd-top-card {
+                min-height: 112px !important;
+            }
+
+            .rd-top-value {
+                font-size: clamp(21px, 7vw, 30px) !important;
+            }
+
+            .rd-top-unit {
+                font-size: clamp(10px, 3.2vw, 13px) !important;
+            }
+        }
+
+
+        /* =====================================================
+           BLOQUEO DE TIPOGRAFÍA
+           Mantiene tamaños de letra fijos como en Inventario.
+           El responsive queda en contenedores/espaciados, no en fuentes.
+        ===================================================== */
+        .rd-main-title {
+            font-size: 44px !important;
+            line-height: 1.16 !important;
+            letter-spacing: -1.2px !important;
+            margin: 0 0 20px 0 !important;
+            padding: 6px 0 0 0 !important;
+            min-height: 58px !important;
+            overflow: visible !important;
+            white-space: normal !important;
+        }
+
+        .rd-top-title {
+            font-size: 15px !important;
+            line-height: 1.12 !important;
+            letter-spacing: -0.15px !important;
+            margin: 0 0 8px 0 !important;
+        }
+
+        .rd-top-value {
+            font-size: 39px !important;
+            line-height: 0.98 !important;
+            letter-spacing: -1.15px !important;
+            margin: 0 0 8px 0 !important;
+            column-gap: 7px !important;
+        }
+
+        .rd-top-unit {
+            font-size: 15px !important;
+            line-height: 1.05 !important;
+            letter-spacing: -0.25px !important;
+        }
+
+        .rd-top-description {
+            font-size: 12px !important;
+            line-height: 1.22 !important;
+            letter-spacing: 0 !important;
+        }
+
+        .rd-chart-header h3 {
+            font-size: 17px !important;
+            line-height: 1.16 !important;
+            letter-spacing: -0.25px !important;
+        }
+
+        .rd-chart-header p {
+            font-size: 12px !important;
+            line-height: 1.25 !important;
+            margin: 8px 0 0 0 !important;
+        }
+
+        .rd-small-kpi-label {
+            font-size: 9px !important;
+            line-height: 1.1 !important;
+            margin: 0 0 4px 0 !important;
+        }
+
+        .rd-small-kpi-value {
+            font-size: 18px !important;
+            line-height: 1 !important;
+        }
+
+        .rd-small-kpi-value-wide {
+            font-size: 21px !important;
+        }
+
+        .rd-ranking-title {
+            font-size: 16px !important;
+            line-height: 1.15 !important;
+            margin: 0 0 8px 0 !important;
+        }
+
+        .rd-ranking-top {
+            font-size: 12px !important;
+            line-height: 1.1 !important;
+            margin-bottom: 3px !important;
+            gap: 10px !important;
+        }
+
+        .rd-ranking-top strong {
+            font-size: 14px !important;
+            line-height: 1.1 !important;
+        }
+
+        .rd-footer {
+            font-size: 11px !important;
+            line-height: 1.15 !important;
+            margin: 7px 0 0 0 !important;
+        }
+
+        /* En pantallas menores, solo se compacta estructura; las fuentes no cambian. */
+        @media (max-width: 1180px) {
+            .rd-main-title { font-size: 44px !important; }
+            .rd-top-title { font-size: 15px !important; }
+            .rd-top-value { font-size: 39px !important; }
+            .rd-top-unit { font-size: 15px !important; }
+            .rd-top-description { font-size: 12px !important; }
+            .rd-chart-header h3 { font-size: 17px !important; }
+            .rd-chart-header p { font-size: 12px !important; }
+        }
+
+        @media (max-width: 760px) {
+            .rd-main-title {
+                font-size: 44px !important;
+                line-height: 1.16 !important;
+                min-height: 58px !important;
+                margin-bottom: 20px !important;
+                padding-top: 6px !important;
+            }
+            .rd-top-title { font-size: 15px !important; }
+            .rd-top-value { font-size: 39px !important; }
+            .rd-top-unit { font-size: 15px !important; }
+            .rd-top-description { font-size: 12px !important; }
+        }
+
+
+        /* =====================================================
+           BLOQUEO DE ESPACIADO ENTRE KPIs Y GRÁFICA
+           Evita que el gap se comprima al cambiar el ancho.
+        ===================================================== */
+        :root {
+            --rd-fixed-row-gap: 12px;
+            --rd-kpi-chart-gap: 12px;
+            --rd-section-gap: 12px;
+        }
+
+        /* Deja el gap base de Streamlit fijo, no dependiente del viewport. */
+        div[data-testid="stVerticalBlock"] {
+            gap: var(--rd-fixed-row-gap) !important;
+        }
+
+        div[data-testid="stHorizontalBlock"] {
+            gap: var(--rd-fixed-row-gap) !important;
+        }
+
+        /* Fila de KPIs: separación constante antes de la gráfica. */
+        div[data-testid="stHorizontalBlock"]:has(.rd-top-card) {
+            margin-bottom: 12px !important;
+        }
+
+        /* El separador manual ya no depende de clamp/vw. */
+        .rd-kpi-chart-gap {
+            display: block !important;
+            height: 0 !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            line-height: 0 !important;
+            overflow: hidden !important;
+        }
+
+        div[data-testid="stElementContainer"]:has(.rd-kpi-chart-gap),
+        div[data-testid="stMarkdownContainer"]:has(.rd-kpi-chart-gap) {
+            height: 0 !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+        }
+
+        /* La tarjeta de la gráfica conserva su borde sin pegarse a los KPIs. */
+        [data-testid="stVerticalBlockBorderWrapper"]:has(.rd-chart-anchor) {
+            margin-top: 0 !important;
+        }
+
     </style>
     """,
     unsafe_allow_html=True
 )
-
-
-# =========================
-# Cargar CSS personalizado
-# =========================
-css_path = Path("styles/main.css")
-
-if css_path.exists():
-    with open(css_path, encoding="utf-8") as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 
 # =========================
@@ -266,87 +838,28 @@ progreso_rotacion = min((rotacion_promedio / 1) * 100, 100)
 # =========================
 # Tarjeta compacta superior
 # =========================
-def compact_metric_card(title, value, description, badge, icon, accent_color, progress):
+def compact_metric_card(title, value, description, badge, icon, accent_color, progress, unit=""):
     title = escape(str(title))
     value = escape(str(value))
+    unit = escape(str(unit))
     description = escape(str(description))
-    badge = escape(str(badge))
-    icon = escape(str(icon))
 
-    progress = max(0, min(safe_float(progress), 100))
+    unit_html = f'<span class="rd-top-unit">{unit}</span>' if unit else ""
 
     return f"""
-<!DOCTYPE html>
-<html>
-<head>
-<style>
-    body {{
-        margin: 0;
-        background: transparent;
-        font-family: Inter, system-ui, sans-serif;
-    }}
-
-    .metric-card {{
-        position: relative;
-        overflow: hidden;
-        height: 155px;
-        box-sizing: border-box;
-        border-radius: 24px;
-        padding: 26px 20px 18px 20px;
-        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        border: 1px solid rgba(148, 163, 184, 0.28);
-    }}
-
-    .metric-card::before {{
-        content: "";
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 7px;
-        background: var(--accent-color);
-    }}
-
-    .metric-title {{
-        color: #0f172a;
-        font-size: 15px;
-        font-weight: 900;
-        margin: 0 0 14px 0;
-    }}
-
-    .metric-value {{
-        color: #0f172a;
-        font-size: 28px;
-        font-weight: 950;
-        line-height: 1;
-        margin: 0 0 8px 0;
-    }}
-
-    .metric-description {{
-        color: #64748b;
-        font-size: 13px;
-        font-weight: 700;
-        margin: 0;
-    }}
-</style>
-</head>
-
-<body>
-    <div class="metric-card" style="--accent-color: {accent_color};">
-        <p class="metric-title">{title}</p>
-        <p class="metric-value">{value}</p>
-        <p class="metric-description">{description}</p>
+    <div class="rd-top-card" style="--accent-color: {accent_color};">
+        <p class="rd-top-title">{title}</p>
+        <p class="rd-top-value"><span class="rd-top-number">{value}</span>{unit_html}</p>
+        <p class="rd-top-description">{description}</p>
     </div>
-</body>
-</html>
-"""
+    """
 
 
 # =========================
 # Encabezado
 # =========================
 st.markdown(
-    '<h1 class="main-title">Panel de Control Principal</h1>',
+    '<div class="rd-main-title">Panel de Control Principal</div>',
     unsafe_allow_html=True
 )
 
@@ -357,58 +870,63 @@ st.markdown(
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    components.html(
+    st.markdown(
         compact_metric_card(
             title="Overstock Crítico",
-            value=f"{unidades_excedentes:,.0f} unidades excedentes",
+            value=f"{unidades_excedentes:,.0f}",
+            unit="unidades excedentes",
             description=f"{productos_criticos:,} productos",
             badge="Riesgo alto",
             icon="🚨",
             accent_color="#dc2626",
             progress=progreso_overstock
         ),
-        height=160,
-        scrolling=False
+        unsafe_allow_html=True
     )
 
 with col2:
-    components.html(
+    st.markdown(
         compact_metric_card(
             title="Días Prom. Inventario",
-            value=f"{dias_promedio_inventario:.0f} días",
+            value=f"{dias_promedio_inventario:.0f}",
+            unit="días",
             description=f"{dias_promedio_critico:.0f} días en productos críticos",
             badge="Inventario lento",
             icon="⏳",
             accent_color="#f59e0b",
             progress=progreso_dias
         ),
-        height=160,
-        scrolling=False
+        unsafe_allow_html=True
     )
 
 with col3:
-    components.html(
+    st.markdown(
         compact_metric_card(
             title="Rotación Inventario",
             value=f"{rotacion_promedio:.2f}x",
+            unit="",
             description=f"{rotacion_critica:.2f}x en productos críticos",
             badge="Baja rotación",
             icon="🔄",
             accent_color="#2563eb",
             progress=progreso_rotacion
         ),
-        height=160,
-        scrolling=False
+        unsafe_allow_html=True
     )
 
+# Separación explícita entre KPIs y gráfica.
+# No depende del padding de columnas ni de :has(), por eso es más estable.
+st.markdown('<div class="rd-kpi-chart-gap" aria-hidden="true">&nbsp;</div>', unsafe_allow_html=True)
 
 # =========================
 # Card: Ventas mensuales vs stock total
 # =========================
 with st.container(border=True):
 
+    st.markdown('<div class="rd-chart-anchor" aria-hidden="true"></div>', unsafe_allow_html=True)
+
     st.markdown("""
-    <div class="chart-card-header">
+    <div class="rd-chart-header">
         <h3>Ventas mensuales vs stock total</h3>
         <p>
             Las barras muestran las unidades vendidas por mes y la línea representa el stock disponible.
@@ -459,20 +977,23 @@ with st.container(border=True):
 
     fig.update_layout(
         title="",
-        height=260,
-        margin=dict(l=30, r=30, t=10, b=25),
-        xaxis=dict(title=None),
-        yaxis=dict(title="Vendidas", showgrid=True),
+        autosize=True,
+        height=220,
+        margin=dict(l=26, r=26, t=0, b=18),
+        font=dict(size=10),
+        xaxis=dict(title=None, automargin=True),
+        yaxis=dict(title="Vendidas", showgrid=True, automargin=True),
         yaxis2=dict(
             title="Stock",
             overlaying="y",
             side="right",
-            showgrid=False
+            showgrid=False,
+            automargin=True
         ),
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=1.03,
+            y=1.02,
             xanchor="right",
             x=1
         ),
@@ -487,38 +1008,8 @@ with st.container(border=True):
         config={"displayModeBar": False}
     )
 
-st.markdown("""
-<style>
-.chart-card-header {
-    padding: 4px 8px 0 8px;
-    margin-bottom: 6px;
-}
-
-.chart-card-header h3 {
-    color: #0f172a;
-    font-size: 22px;
-    font-weight: 900;
-    margin: 0;
-    letter-spacing: -0.4px;
-}
-
-.chart-card-header p {
-    color: #64748b;
-    font-size: 14px;
-    font-weight: 600;
-    margin: 6px 0 0 0;
-}
-
-[data-testid="stVerticalBlockBorderWrapper"] {
-    border-radius: 24px !important;
-    border: 1px solid rgba(148, 163, 184, 0.22) !important;
-    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.035) !important;
-    padding: 0.4rem 0.6rem !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
+# Separación explícita entre gráfica y panel inferior.
+st.markdown('<div class="rd-chart-bottom-gap" aria-hidden="true">&nbsp;</div>', unsafe_allow_html=True)
 
 # =========================
 # Datos para panel lateral
@@ -581,259 +1072,46 @@ for _, row in top5_sobrestock.iterrows():
     exceso = row["Exceso_stock"]
     porcentaje_barra = (exceso / max_sobrestock) * 100 if max_sobrestock > 0 else 0
 
-    top5_items_html += f"""
-    <div class="ranking-item">
-        <div class="ranking-top">
-            <span class="product-name">{producto_item}</span>
-            <strong>{exceso:,.0f}</strong>
-        </div>
-        <div class="bar-track">
-            <div class="bar-fill" style="width:{porcentaje_barra:.1f}%;"></div>
-        </div>
-    </div>
-    """
+    top5_items_html += (
+        f'<div class="rd-ranking-item">'
+        f'<div class="rd-ranking-top">'
+        f'<span class="rd-product-name">{producto_item}</span>'
+        f'<strong>{exceso:,.0f}</strong>'
+        f'</div>'
+        f'<div class="rd-bar-track">'
+        f'<div class="rd-bar-fill" style="width:{porcentaje_barra:.1f}%;"></div>'
+        f'</div>'
+        f'</div>'
+    )
 
 # =========================
 # Panel lateral compacto
 # =========================
-side_panel_html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-<style>
-    html, body {{
-        margin: 0;
-        padding: 0;
-        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: transparent;
-        overflow: visible;
-    }}
-
-    .side-card {{
-        height: 205px;
-        box-sizing: border-box;
-        border-radius: 22px;
-        padding: 14px 18px;
-        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        border: 1px solid rgba(148, 163, 184, 0.22);
-        overflow: visible;
-    }}
-
-    .content-grid {{
-        display: grid;
-        grid-template-columns: 0.9fr 1.45fr;
-        gap: 18px;
-        align-items: start;
-        width: 100%;
-    }}
-
-    .kpi-grid {{
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
-        width: 100%;
-    }}
-
-    .kpi-wide {{
-        grid-column: 1 / span 2;
-    }}
-
-    .kpi {{
-        position: relative;
-        cursor: help;
-
-        border-radius: 16px;
-        background: rgba(255, 255, 255, 0.85);
-        border: 1px solid rgba(148, 163, 184, 0.22);
-        padding: 10px 10px;
-        min-height: 58px;
-
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        text-align: center;
-    }}
-
-    .kpi-label {{
-        color: #64748b;
-        font-size: 9px;
-        font-weight: 850;
-        text-transform: uppercase;
-        margin: 0 0 6px 0;
-        white-space: nowrap;
-        text-align: center;
-    }}
-
-    .kpi-value {{
-        color: #0f172a;
-        font-size: 21px;
-        font-weight: 950;
-        letter-spacing: -0.7px;
-        line-height: 1;
-        margin: 0;
-        text-align: center;
-    }}
-
-    .kpi-value-wide {{
-        font-size: 25px;
-    }}
-
-    .ranking-section {{
-        width: 100%;
-        min-width: 0;
-    }}
-
-    .section-title {{
-        color: #0f172a;
-        font-size: 13px;
-        font-weight: 900;
-        margin: 0 0 8px 0;
-    }}
-
-    .ranking-item {{
-        margin-bottom: 5px;
-    }}
-
-    .ranking-top {{
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 3px;
-        color: #111827;
-        font-size: 11px;
-        font-weight: 800;
-        line-height: 1.1;
-    }}
-
-    .ranking-top strong {{
-        color: #dc2626;
-        font-size: 11px;
-    }}
-
-    .bar-track {{
-        width: 100%;
-        height: 6px;
-        background: #fee2e2;
-        border-radius: 999px;
-        overflow: hidden;
-    }}
-
-    .bar-fill {{
-        height: 100%;
-        background: linear-gradient(90deg, #ef4444, #991b1b);
-        border-radius: 999px;
-    }}
-
-    .footer {{
-        color: #94a3b8;
-        font-size: 9px;
-        font-weight: 650;
-        margin-top: 4px;
-    }}
-
-    /* Tooltip */
-    .kpi::after {{
-        content: attr(data-tooltip);
-        position: absolute;
-        left: 50%;
-        transform: translateX(-50%);
-        width: max-content;
-        max-width: 230px;
-        background: #0f172a;
-        color: white;
-        font-size: 10px;
-        font-weight: 650;
-        line-height: 1.3;
-        padding: 8px 10px;
-        border-radius: 10px;
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.18s ease, transform 0.18s ease;
-        z-index: 999;
-        text-align: center;
-        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.22);
-    }}
-
-    .kpi::before {{
-        content: "";
-        position: absolute;
-        left: 50%;
-        transform: translateX(-50%);
-        border: 6px solid transparent;
-        opacity: 0;
-        transition: opacity 0.18s ease;
-        z-index: 999;
-    }}
-
-    .tooltip-bottom::after {{
-        top: calc(100% + 8px);
-    }}
-
-    .tooltip-bottom::before {{
-        top: calc(100% - 1px);
-        border-bottom-color: #0f172a;
-    }}
-
-    .tooltip-top::after {{
-        bottom: calc(100% + 8px);
-    }}
-
-    .tooltip-top::before {{
-        bottom: calc(100% - 1px);
-        border-top-color: #0f172a;
-    }}
-
-    .kpi:hover::after,
-    .kpi:hover::before {{
-        opacity: 1;
-    }}
-
-    .kpi:hover::after {{
-        transform: translateX(-50%) translateY(-2px);
-    }}
-</style>
-</head>
-
-<body>
-    <div class="side-card">
-        <div class="content-grid">
-
-            <div class="kpi-grid">
-                <div class="kpi tooltip-bottom" data-tooltip="Porcentaje de ventas realizadas respecto al total esperado o disponible en el periodo seleccionado.">
-                    <p class="kpi-label">% ventas</p>
-                    <p class="kpi-value">{porcentaje_ventas:.1f}%</p>
-                </div>
-
-                <div class="kpi tooltip-bottom" data-tooltip="Porcentaje del inventario disponible que logró venderse. Mientras más alto, mejor movimiento del stock.">
-                    <p class="kpi-label">Sell-through</p>
-                    <p class="kpi-value">{sell_through_rate:.1f}%</p>
-                </div>
-
-                <div class="kpi kpi-wide tooltip-top" data-tooltip="Cantidad total de unidades vendidas según los filtros seleccionados.">
-                    <p class="kpi-label">Unidades vendidas</p>
-                    <p class="kpi-value kpi-value-wide">{ventas_unidades_totales:,.0f}</p>
-                </div>
-            </div>
-
-            <div class="ranking-section">
-                <p class="section-title">Top 5 productos con mayor sobrestock</p>
-
-                {top5_items_html}
-
-                <p class="footer">
-                    Medido por unidades excedentes de stock.
-                </p>
-            </div>
-
-        </div>
-    </div>
-</body>
-</html>
-"""
-
-components.html(
-    side_panel_html,
-    height=270,
-    scrolling=False
+# Importante: se arma sin indentación tipo Markdown para que Streamlit no lo interprete como bloque de código.
+side_panel_html = (
+    f'<div class="rd-bottom-card">'
+    f'<div class="rd-bottom-grid">'
+    f'<div class="rd-small-kpi-grid">'
+    f'<div class="rd-small-kpi rd-tooltip-bottom" data-tooltip="Porcentaje de ventas realizadas respecto al total esperado o disponible en el periodo seleccionado.">'
+    f'<p class="rd-small-kpi-label">% ventas</p>'
+    f'<p class="rd-small-kpi-value">{porcentaje_ventas:.1f}%</p>'
+    f'</div>'
+    f'<div class="rd-small-kpi rd-tooltip-bottom" data-tooltip="Porcentaje del inventario disponible que logró venderse. Mientras más alto, mejor movimiento del stock.">'
+    f'<p class="rd-small-kpi-label">Sell-through</p>'
+    f'<p class="rd-small-kpi-value">{sell_through_rate:.1f}%</p>'
+    f'</div>'
+    f'<div class="rd-small-kpi rd-small-kpi-wide rd-tooltip-top" data-tooltip="Cantidad total de unidades vendidas según los filtros seleccionados.">'
+    f'<p class="rd-small-kpi-label">Unidades vendidas</p>'
+    f'<p class="rd-small-kpi-value rd-small-kpi-value-wide">{ventas_unidades_totales:,.0f}</p>'
+    f'</div>'
+    f'</div>'
+    f'<div class="rd-ranking">'
+    f'<p class="rd-ranking-title">Top 5 productos con mayor sobrestock</p>'
+    f'{top5_items_html}'
+    f'<p class="rd-footer">Medido por unidades excedentes de stock.</p>'
+    f'</div>'
+    f'</div>'
+    f'</div>'
 )
+
+st.markdown(side_panel_html, unsafe_allow_html=True)

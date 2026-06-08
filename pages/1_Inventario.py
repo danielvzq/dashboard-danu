@@ -17,43 +17,57 @@ st.set_page_config(
 
 
 # =========================
-# CSS general compacto
+# CSS general responsivo
 # =========================
 st.markdown(
     """
     <style>
         .block-container {
-            padding-top: 2.2rem !important;
-            padding-bottom: 0.8rem !important;
-            padding-left: 1.4rem !important;
-            padding-right: 1.4rem !important;
+            padding-top: clamp(1.4rem, 2vh, 2.2rem) !important;
+            padding-bottom: clamp(0.8rem, 1.4vh, 1.2rem) !important;
+            padding-left: clamp(1rem, 1.9vw, 1.6rem) !important;
+            padding-right: clamp(1rem, 1.9vw, 1.6rem) !important;
             max-width: 100% !important;
         }
 
         h1, h2, h3 {
             margin-top: 0 !important;
-            margin-bottom: 0.6rem !important;
         }
 
         .main-title {
-            color: white;
-            font-size: 30px;
+            color: #0f172a;
+            font-size: clamp(2rem, 3.35vw, 3.25rem);
             font-weight: 950;
-            letter-spacing: -0.8px;
-            margin: 0 0 16px 0;
-            line-height: 1.2;
+            letter-spacing: clamp(-1.4px, -0.12vw, -0.7px);
+            margin: 0 0 clamp(1rem, 1.6vw, 1.5rem) 0;
+            line-height: 1.05;
         }
 
         div[data-testid="stVerticalBlock"] {
-            gap: 0.65rem !important;
+            gap: clamp(0.5rem, 0.8vw, 0.75rem) !important;
         }
 
         div[data-testid="stHorizontalBlock"] {
-            gap: 0.8rem !important;
+            gap: clamp(0.55rem, 0.85vw, 0.8rem) !important;
         }
 
         iframe {
             display: block;
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+
+        @media (max-width: 760px) {
+            .block-container {
+                padding-left: 0.75rem !important;
+                padding-right: 0.75rem !important;
+                padding-top: 1rem !important;
+            }
+
+            .main-title {
+                font-size: clamp(1.7rem, 8vw, 2.35rem);
+                margin-bottom: 0.85rem;
+            }
         }
     </style>
     """,
@@ -461,16 +475,17 @@ producto_mayor_problema = (
 valor_top5 = top5_productos["valor_inmovilizado"].sum()
 
 # =========================
-# Vista HTML completa
+# Vista HTML completa responsiva
 # =========================
 dashboard_html = f"""
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <style>
     html, body {{
         width: 100%;
-        height: 100%;
         margin: 0;
         padding: 0;
         background: transparent;
@@ -482,20 +497,26 @@ dashboard_html = f"""
         box-sizing: border-box;
     }}
 
+    .dashboard-shell {{
+        width: 100%;
+        max-width: 1500px;
+        margin: 0 auto;
+    }}
+
     .view {{
         width: 100%;
-        height: 100vh;
-        min-height: 100vh;
+        height: clamp(640px, 53vw, 760px);
+        min-height: 640px;
         overflow: hidden;
         display: grid;
-        grid-template-rows: minmax(112px, 0.95fr) minmax(0, 2.7fr) minmax(112px, 0.95fr);
-        gap: clamp(8px, 1.15vh, 14px);
+        grid-template-rows: minmax(112px, 0.95fr) minmax(0, 2.72fr) minmax(112px, 0.95fr);
+        gap: clamp(8px, 0.82vw, 12px);
     }}
 
     .kpi-grid {{
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 10px;
+        gap: clamp(8px, 0.82vw, 12px);
         min-height: 0;
         height: 100%;
         margin: 0;
@@ -504,12 +525,12 @@ dashboard_html = f"""
     .kpi-card {{
         position: relative;
         background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        border: 1px solid rgba(148, 163, 184, 0.22);
-        border-radius: 22px;
-        padding: clamp(14px, 2vh, 20px) 18px 12px 18px;
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        border-radius: clamp(18px, 1.55vw, 24px);
+        padding: clamp(14px, 1.35vw, 22px) clamp(14px, 1.45vw, 22px) clamp(12px, 1.05vw, 18px);
         height: 100%;
         min-height: 0;
-        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.025);
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.035);
         overflow: hidden;
         display: flex;
         flex-direction: column;
@@ -522,7 +543,7 @@ dashboard_html = f"""
         top: 0;
         left: 0;
         width: 100%;
-        height: 6px;
+        height: clamp(5px, 0.45vw, 7px);
         background: #2563eb;
     }}
 
@@ -533,12 +554,12 @@ dashboard_html = f"""
 
     .kpi-top {{
         display: block;
-        margin-bottom: clamp(5px, 1vh, 9px);
+        margin-bottom: clamp(5px, 0.65vw, 9px);
     }}
 
     .kpi-label {{
         color: #0f172a;
-        font-size: clamp(12px, 1.1vw, 14px);
+        font-size: clamp(12px, 1.02vw, 15px);
         font-weight: 950;
         margin: 0;
         line-height: 1.1;
@@ -550,11 +571,11 @@ dashboard_html = f"""
 
     .kpi-value {{
         color: #0f172a;
-        font-size: clamp(26px, 2.6vw, 38px);
+        font-size: clamp(27px, 2.55vw, 40px);
         font-weight: 950;
         line-height: 1;
-        letter-spacing: -1px;
-        margin: 0 0 6px 0;
+        letter-spacing: clamp(-1.35px, -0.08vw, -0.8px);
+        margin: 0 0 clamp(6px, 0.55vw, 9px) 0;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -562,10 +583,10 @@ dashboard_html = f"""
 
     .kpi-desc {{
         color: #64748b;
-        font-size: clamp(10px, 0.9vw, 12px);
-        font-weight: 700;
+        font-size: clamp(10px, 0.86vw, 12.5px);
+        font-weight: 750;
         margin: 0;
-        line-height: 1.25;
+        line-height: 1.24;
         display: -webkit-box;
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
@@ -575,7 +596,7 @@ dashboard_html = f"""
     .main-grid {{
         display: grid;
         grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.95fr);
-        gap: 10px;
+        gap: clamp(8px, 0.82vw, 12px);
         min-height: 0;
         height: 100%;
         margin: 0;
@@ -583,15 +604,36 @@ dashboard_html = f"""
 
     .panel {{
         background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        border: 1px solid rgba(148, 163, 184, 0.22);
-        border-radius: 22px;
-        padding: clamp(12px, 1.7vh, 16px) 18px;
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        border-radius: clamp(18px, 1.55vw, 24px);
+        padding: clamp(13px, 1.18vw, 18px) clamp(16px, 1.45vw, 22px);
         height: 100%;
         min-height: 0;
-        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.025);
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.035);
         overflow: hidden;
         display: flex;
         flex-direction: column;
+    }}
+
+    .products-panel {{
+        min-width: 0;
+    }}
+
+    .panel-title {{
+        color: #0f172a;
+        font-size: clamp(14px, 1.15vw, 17px);
+        font-weight: 950;
+        margin: 0 0 clamp(8px, 0.8vw, 12px) 0;
+        letter-spacing: -0.25px;
+        line-height: 1.15;
+    }}
+
+    .panel-subtitle {{
+        color: #64748b;
+        font-size: clamp(10px, 0.82vw, 12px);
+        font-weight: 750;
+        margin: calc(clamp(6px, 0.65vw, 10px) * -1) 0 clamp(8px, 0.78vw, 12px) 0;
+        line-height: 1.25;
     }}
 
     .product-list {{
@@ -599,22 +641,7 @@ dashboard_html = f"""
         min-height: 0;
         display: grid;
         grid-template-rows: repeat(5, minmax(0, 1fr));
-        gap: clamp(8px, 1.35vh, 16px);
-    }}
-
-    .panel-title {{
-        color: #0f172a;
-        font-size: clamp(14px, 1.2vw, 16px);
-        font-weight: 950;
-        margin: 0 0 4px 0;
-        letter-spacing: -0.25px;
-    }}
-
-    .panel-subtitle {{
-        color: #64748b;
-        font-size: 11px;
-        font-weight: 700;
-        margin: 0 0 8px 0;
+        gap: clamp(7px, 0.95vw, 15px);
     }}
 
     .product-row {{
@@ -629,13 +656,13 @@ dashboard_html = f"""
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: 12px;
-        margin-bottom: 4px;
+        gap: clamp(8px, 0.8vw, 12px);
+        margin-bottom: clamp(3px, 0.35vw, 5px);
     }}
 
     .product-name {{
         color: #111827;
-        font-size: clamp(12px, 1vw, 15px);
+        font-size: clamp(12px, 0.98vw, 15px);
         font-weight: 900;
         max-width: 76%;
         white-space: nowrap;
@@ -645,14 +672,14 @@ dashboard_html = f"""
 
     .product-value {{
         color: #dc2626;
-        font-size: clamp(12px, 1vw, 15px);
+        font-size: clamp(12px, 0.98vw, 15px);
         font-weight: 950;
         white-space: nowrap;
     }}
 
     .bar-track {{
         width: 100%;
-        height: clamp(6px, 0.9vh, 10px);
+        height: clamp(6px, 0.58vw, 10px);
         background: #fee2e2;
         border-radius: 999px;
         overflow: hidden;
@@ -667,18 +694,28 @@ dashboard_html = f"""
     .product-bottom {{
         display: flex;
         justify-content: space-between;
-        gap: 10px;
+        gap: clamp(8px, 0.8vw, 12px);
         color: #94a3b8;
-        font-size: clamp(10px, 0.85vw, 12px);
-        font-weight: 750;
-        margin-top: 4px;
+        font-size: clamp(10px, 0.78vw, 12px);
+        font-weight: 800;
+        margin-top: clamp(3px, 0.35vw, 5px);
+        line-height: 1.15;
+    }}
+
+    .product-bottom span {{
+        min-width: 0;
+    }}
+
+    .product-bottom span:last-child {{
+        text-align: right;
+        white-space: nowrap;
     }}
 
     .dead-summary {{
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 8px;
-        margin-bottom: 8px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: clamp(8px, 0.75vw, 10px);
+        margin-bottom: clamp(8px, 0.78vw, 12px);
     }}
 
     .dead-list {{
@@ -689,23 +726,25 @@ dashboard_html = f"""
     }}
 
     .dead-mini {{
-        background: rgba(255, 255, 255, 0.85);
-        border: 1px solid rgba(148, 163, 184, 0.22);
-        border-radius: 16px;
-        padding: clamp(8px, 1.4vh, 10px) 12px;
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        border-radius: clamp(14px, 1.2vw, 18px);
+        padding: clamp(9px, 0.88vw, 12px) clamp(12px, 1.05vw, 16px);
+        overflow: hidden;
     }}
 
     .dead-mini-label {{
         color: #64748b;
-        font-size: 9px;
-        font-weight: 900;
+        font-size: clamp(8.5px, 0.68vw, 10px);
+        font-weight: 950;
         text-transform: uppercase;
-        margin: 0 0 5px 0;
+        margin: 0 0 clamp(4px, 0.42vw, 6px) 0;
+        line-height: 1.1;
     }}
 
     .dead-mini-value {{
         color: #0f172a;
-        font-size: clamp(18px, 1.8vw, 22px);
+        font-size: clamp(19px, 1.68vw, 24px);
         font-weight: 950;
         margin: 0;
         line-height: 1;
@@ -714,15 +753,15 @@ dashboard_html = f"""
     .dead-row {{
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
-        gap: 10px;
+        gap: clamp(8px, 0.75vw, 12px);
         align-items: center;
-        padding: clamp(5px, 0.8vh, 7px) 0;
+        padding: clamp(5px, 0.58vw, 8px) 0;
         border-bottom: 1px solid rgba(148, 163, 184, 0.18);
     }}
 
     .dead-name {{
         color: #111827;
-        font-size: clamp(10px, 0.9vw, 12px);
+        font-size: clamp(10px, 0.82vw, 12px);
         font-weight: 900;
         margin: 0;
         max-width: 100%;
@@ -733,26 +772,28 @@ dashboard_html = f"""
 
     .dead-meta {{
         color: #64748b;
-        font-size: clamp(9px, 0.75vw, 10px);
-        font-weight: 700;
+        font-size: clamp(9px, 0.7vw, 10px);
+        font-weight: 750;
         margin: 3px 0 0 0;
+        line-height: 1.2;
     }}
 
     .dead-value {{
         color: #dc2626;
-        font-size: clamp(10px, 0.9vw, 12px);
+        font-size: clamp(10px, 0.82vw, 12px);
         font-weight: 950;
         white-space: nowrap;
     }}
 
     .empty-state {{
         color: #64748b;
-        font-size: clamp(12px, 1vw, 15px);
-        font-weight: 700;
-        background: rgba(241, 245, 249, 0.9);
-        border-radius: 16px;
-        padding: 14px;
-        min-height: 100%;
+        font-size: clamp(12px, 0.98vw, 15px);
+        font-weight: 750;
+        background: rgba(241, 245, 249, 0.92);
+        border-radius: clamp(14px, 1.25vw, 18px);
+        padding: clamp(14px, 1.3vw, 18px);
+        flex: 1;
+        min-height: 0;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -762,7 +803,7 @@ dashboard_html = f"""
     .insight-grid {{
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 10px;
+        gap: clamp(8px, 0.82vw, 12px);
         min-height: 0;
         height: 100%;
         margin: 0;
@@ -770,12 +811,12 @@ dashboard_html = f"""
 
     .insight {{
         background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        border: 1px solid rgba(148, 163, 184, 0.22);
-        border-radius: 22px;
-        padding: clamp(12px, 1.7vh, 15px) 18px;
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        border-radius: clamp(18px, 1.55vw, 24px);
+        padding: clamp(13px, 1.18vw, 18px) clamp(16px, 1.45vw, 22px);
         height: 100%;
         min-height: 0;
-        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.025);
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.035);
         overflow: hidden;
         display: flex;
         flex-direction: column;
@@ -784,17 +825,18 @@ dashboard_html = f"""
 
     .insight-label {{
         color: #64748b;
-        font-size: clamp(9px, 0.8vw, 10px);
+        font-size: clamp(9px, 0.72vw, 10.5px);
         font-weight: 950;
         text-transform: uppercase;
-        margin: 0 0 6px 0;
+        margin: 0 0 clamp(6px, 0.5vw, 8px) 0;
+        line-height: 1.1;
     }}
 
     .insight-title {{
         color: #0f172a;
-        font-size: clamp(13px, 1.2vw, 15px);
+        font-size: clamp(13px, 1.1vw, 16px);
         font-weight: 950;
-        margin: 0 0 5px 0;
+        margin: 0 0 clamp(5px, 0.42vw, 7px) 0;
         line-height: 1.15;
         white-space: nowrap;
         overflow: hidden;
@@ -803,8 +845,8 @@ dashboard_html = f"""
 
     .insight-text {{
         color: #64748b;
-        font-size: clamp(10px, 0.9vw, 11px);
-        font-weight: 700;
+        font-size: clamp(10px, 0.82vw, 11.5px);
+        font-weight: 750;
         line-height: 1.3;
         margin: 0;
         display: -webkit-box;
@@ -813,131 +855,407 @@ dashboard_html = f"""
         overflow: hidden;
     }}
 
-    @media (max-height: 720px) {{
-        .view {{
-            grid-template-rows: minmax(84px, 0.85fr) minmax(0, 2.7fr) minmax(92px, 0.85fr);
-            gap: 8px;
+    @media (max-width: 1180px) {{
+        html, body {{
+            overflow: visible;
         }}
 
-        .kpi-card,
-        .panel,
+        .view {{
+            height: auto;
+            min-height: 0;
+            overflow: visible;
+            grid-template-rows: auto;
+        }}
+
+        .kpi-grid {{
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            height: auto;
+            gap: clamp(6px, 0.75vw, 10px);
+        }}
+
+        .kpi-card {{
+            min-height: clamp(112px, 13vw, 142px);
+            padding: clamp(12px, 1.25vw, 18px) clamp(10px, 1.25vw, 18px);
+        }}
+
+        .kpi-label {{
+            font-size: clamp(10px, 1.35vw, 13px);
+        }}
+
+        .kpi-value {{
+            font-size: clamp(20px, 3vw, 31px);
+        }}
+
+        .kpi-desc {{
+            font-size: clamp(8.5px, 1.15vw, 11px);
+        }}
+
+        .main-grid {{
+            grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.95fr);
+            height: auto;
+            gap: clamp(6px, 0.75vw, 10px);
+        }}
+
+        .panel {{
+            min-height: clamp(330px, 34vw, 380px);
+            padding: clamp(12px, 1.1vw, 17px) clamp(12px, 1.25vw, 20px);
+        }}
+
+        .insight-grid {{
+            height: auto;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }}
+
         .insight {{
-            border-radius: 18px;
+            min-height: 126px;
+        }}
+    }}
+
+    @media (max-width: 820px) {{
+        .kpi-grid {{
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 6px;
+        }}
+
+        .insight-grid {{
+            grid-template-columns: 1fr;
+        }}
+
+        .dead-summary {{
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px;
+        }}
+
+        .kpi-card {{
+            min-height: clamp(104px, 24vw, 124px);
+            padding: 11px 7px 9px;
+            border-radius: 14px;
+        }}
+
+        .kpi-card::before {{
+            height: 4px;
+        }}
+
+        .kpi-top {{
+            margin-bottom: 4px;
+        }}
+
+        .kpi-label {{
+            font-size: clamp(7.5px, 2.2vw, 10px);
+            line-height: 1.08;
+        }}
+
+        .kpi-value {{
+            font-size: clamp(13px, 4.4vw, 19px);
+            line-height: 0.98;
+            letter-spacing: -0.5px;
+            white-space: normal;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }}
+
+        .kpi-desc {{
+            font-size: clamp(7px, 1.85vw, 8.6px);
+            line-height: 1.13;
+            -webkit-line-clamp: 2;
+        }}
+
+        .main-grid {{
+            grid-template-columns: minmax(0, 1.18fr) minmax(0, 0.92fr);
+            gap: 6px;
+        }}
+
+        .panel {{
+            min-height: clamp(300px, 54vw, 370px);
+            padding: 12px 10px;
+            border-radius: 14px;
+        }}
+
+        .panel-title {{
+            font-size: clamp(10px, 2.05vw, 13px);
+            margin-bottom: 7px;
+        }}
+
+        .panel-subtitle {{
+            font-size: clamp(7.5px, 1.65vw, 9.5px);
+            margin-bottom: 7px;
         }}
 
         .product-list {{
+            display: flex;
+            flex-direction: column;
+            gap: clamp(7px, 1.8vw, 12px);
+        }}
+
+        .product-top,
+        .product-bottom {{
+            align-items: flex-start;
+        }}
+
+        .product-bottom {{
+            flex-direction: column;
+            gap: 3px;
+        }}
+
+        .product-bottom span:last-child {{
+            text-align: left;
+        }}
+
+        .product-name {{
+            max-width: 68%;
+        }}
+
+        .empty-state {{
+            min-height: 220px;
+        }}
+
+        .product-name,
+        .product-value {{
+            font-size: clamp(8px, 1.85vw, 11px);
+        }}
+
+        .product-bottom {{
+            font-size: clamp(7px, 1.45vw, 9px);
+        }}
+
+        .dead-mini {{
+            padding: 8px 7px;
+            border-radius: 11px;
+        }}
+
+        .dead-mini-label {{
+            font-size: clamp(6.4px, 1.35vw, 8px);
+        }}
+
+        .dead-mini-value {{
+            font-size: clamp(13px, 2.7vw, 18px);
+        }}
+
+        .empty-state {{
+            min-height: 180px;
+            font-size: clamp(8.5px, 1.8vw, 11px);
+        }}
+
+        .insight {{
+            min-height: 118px;
+        }}
+    }}
+
+    @media (max-width: 520px) {{
+        .kpi-grid {{
+            grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 5px;
         }}
 
-        .bar-track {{
-            height: 5px;
+        .kpi-card {{
+            min-height: 96px;
+            padding: 10px 5px 8px;
+        }}
+
+        .kpi-label {{
+            font-size: clamp(6.8px, 2.05vw, 8.4px);
+        }}
+
+        .kpi-value {{
+            font-size: clamp(11px, 3.8vw, 15px);
+            margin-bottom: 4px;
+        }}
+
+        .kpi-desc {{
+            font-size: clamp(6.3px, 1.75vw, 7.5px);
+        }}
+
+        .main-grid {{
+            grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.9fr);
+            gap: 5px;
+        }}
+
+        .panel {{
+            min-height: 292px;
+            padding: 10px 6px;
+            border-radius: 13px;
+        }}
+
+        .panel-title {{
+            font-size: clamp(8.4px, 2.25vw, 10.5px);
+        }}
+
+        .panel-subtitle {{
+            font-size: clamp(6.6px, 1.85vw, 8px);
+        }}
+
+        .product-list {{
+            gap: 8px;
+        }}
+
+        .product-name {{
+            max-width: 62%;
+        }}
+
+        .product-name,
+        .product-value,
+        .dead-name,
+        .dead-value {{
+            font-size: clamp(6.9px, 1.95vw, 8.6px);
+        }}
+
+        .product-bottom,
+        .dead-meta {{
+            font-size: clamp(6.2px, 1.7vw, 7.4px);
+        }}
+
+        .dead-summary {{
+            gap: 5px;
+            margin-bottom: 6px;
+        }}
+
+        .dead-mini {{
+            padding: 7px 5px;
+        }}
+
+        .dead-mini-label {{
+            font-size: clamp(5.8px, 1.65vw, 6.8px);
+        }}
+
+        .dead-mini-value {{
+            font-size: clamp(11px, 3vw, 14px);
+        }}
+
+        .empty-state {{
+            min-height: 150px;
+            padding: 10px 6px;
         }}
     }}
 </style>
 </head>
 
 <body>
-    <div class="view">
+    <div class="dashboard-shell">
+        <div class="view">
 
-        <div class="kpi-grid">
-            <div class="kpi-card">
-                <div class="kpi-top">
-                    <p class="kpi-label">Valor inmovilizado</p>
-                    <div class="kpi-icon purple">💰</div>
-                </div>
-                <h2 class="kpi-value">{formato_pesos(total_valor_inmovilizado)}</h2>
-                <p class="kpi-desc">Capital estimado detenido en exceso de inventario</p>
-            </div>
-
-            <div class="kpi-card">
-                <div class="kpi-top">
-                    <p class="kpi-label">Unidades excedentes</p>
-                    <div class="kpi-icon red">📦</div>
-                </div>
-                <h2 class="kpi-value">{formato_numero(total_exceso)}</h2>
-                <p class="kpi-desc">Inventario excedente acumulado en productos</p>
-            </div>
-
-            <div class="kpi-card">
-                <div class="kpi-top">
-                    <p class="kpi-label">Stock muerto</p>
-                    <div class="kpi-icon orange">⚠️</div>
-                </div>
-                <h2 class="kpi-value">{stock_muerto_count:,} productos</h2>
-                <p class="kpi-desc">Con stock disponible y cero ventas en el periodo</p>
-            </div>
-
-            <div class="kpi-card">
-                <div class="kpi-top">
-                    <p class="kpi-label">Concentración Top 5</p>
-                    <div class="kpi-icon blue">🎯</div>
-                </div>
-                <h2 class="kpi-value">{participacion_top5:.1f}%</h2>
-                <p class="kpi-desc">Del sobrestock concentrado en solo 5 productos</p>
-            </div>
-        </div>
-
-        <div class="main-grid">
-            <div class="panel products-panel">
-                <p class="panel-title">Productos que concentran el problema</p>
-
-                <div class="product-list">
-                    {top5_html}
-                </div>
-            </div>
-
-            <div class="panel stock-panel">
-                <p class="panel-title">Stock muerto y movimiento mínimo</p>
-                <p class="panel-subtitle">Productos sin ventas o con sell-through entre 1% y 5%</p>
-
-                <div class="dead-summary">
-                    <div class="dead-mini">
-                        <p class="dead-mini-label">Sin ventas</p>
-                        <h3 class="dead-mini-value">{stock_muerto_count:,}</h3>
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-top">
+                        <p class="kpi-label">Valor inmovilizado</p>
+                        <div class="kpi-icon purple">💰</div>
                     </div>
+                    <h2 class="kpi-value">{formato_pesos(total_valor_inmovilizado)}</h2>
+                    <p class="kpi-desc">Capital estimado detenido en exceso de inventario</p>
+                </div>
 
-                    <div class="dead-mini">
-                        <p class="dead-mini-label">Movimiento mínimo</p>
-                        <h3 class="dead-mini-value">{mov_minimo_count:,}</h3>
+                <div class="kpi-card">
+                    <div class="kpi-top">
+                        <p class="kpi-label">Unidades excedentes</p>
+                        <div class="kpi-icon red">📦</div>
+                    </div>
+                    <h2 class="kpi-value">{formato_numero(total_exceso)}</h2>
+                    <p class="kpi-desc">Inventario excedente acumulado en productos</p>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-top">
+                        <p class="kpi-label">Stock muerto</p>
+                        <div class="kpi-icon orange">⚠️</div>
+                    </div>
+                    <h2 class="kpi-value">{stock_muerto_count:,} productos</h2>
+                    <p class="kpi-desc">Con stock disponible y cero ventas en el periodo</p>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-top">
+                        <p class="kpi-label">Concentración Top 5</p>
+                        <div class="kpi-icon blue">🎯</div>
+                    </div>
+                    <h2 class="kpi-value">{participacion_top5:.1f}%</h2>
+                    <p class="kpi-desc">Del sobrestock concentrado en solo 5 productos</p>
+                </div>
+            </div>
+
+            <div class="main-grid">
+                <div class="panel products-panel">
+                    <p class="panel-title">Productos que concentran el problema</p>
+
+                    <div class="product-list">
+                        {top5_html}
                     </div>
                 </div>
 
-                <div class="dead-list">
-                    {stock_muerto_html}
+                <div class="panel stock-panel">
+                    <p class="panel-title">Stock muerto y movimiento mínimo</p>
+                    <p class="panel-subtitle">Productos sin ventas o con sell-through entre 1% y 5%</p>
+
+                    <div class="dead-summary">
+                        <div class="dead-mini">
+                            <p class="dead-mini-label">Sin ventas</p>
+                            <h3 class="dead-mini-value">{stock_muerto_count:,}</h3>
+                        </div>
+
+                        <div class="dead-mini">
+                            <p class="dead-mini-label">Movimiento mínimo</p>
+                            <h3 class="dead-mini-value">{mov_minimo_count:,}</h3>
+                        </div>
+                    </div>
+
+                    <div class="dead-list">
+                        {stock_muerto_html}
+                    </div>
                 </div>
             </div>
+
+            <div class="insight-grid">
+                <div class="insight">
+                    <p class="insight-label">Punto de partida</p>
+                    <h3 class="insight-title">{producto_mayor_problema}</h3>
+                    <p class="insight-text">
+                        Es el producto con mayor exceso; debe revisarse antes que el resto del catálogo.
+                    </p>
+                </div>
+
+                <div class="insight">
+                    <p class="insight-label">Impacto económico</p>
+                    <h3 class="insight-title">{formato_pesos(valor_top5)} en Top 5</h3>
+                    <p class="insight-text">
+                        El dinero inmovilizado permite priorizar acciones por impacto financiero, no solo por unidades.
+                    </p>
+                </div>
+
+                <div class="insight">
+                    <p class="insight-label">Acción ejecutiva</p>
+                    <h3 class="insight-title">Liquidar, redistribuir o pausar compra</h3>
+                    <p class="insight-text">
+                        Los productos con stock muerto deben tratarse como prioridad operativa y comercial.
+                    </p>
+                </div>
+            </div>
+
         </div>
-
-        <div class="insight-grid">
-            <div class="insight">
-                <p class="insight-label">Punto de partida</p>
-                <h3 class="insight-title">{producto_mayor_problema}</h3>
-                <p class="insight-text">
-                    Es el producto con mayor exceso; debe revisarse antes que el resto del catálogo.
-                </p>
-            </div>
-
-            <div class="insight">
-                <p class="insight-label">Impacto económico</p>
-                <h3 class="insight-title">{formato_pesos(valor_top5)} en Top 5</h3>
-                <p class="insight-text">
-                    El dinero inmovilizado permite priorizar acciones por impacto financiero, no solo por unidades.
-                </p>
-            </div>
-
-            <div class="insight">
-                <p class="insight-label">Acción ejecutiva</p>
-                <h3 class="insight-title">Liquidar, redistribuir o pausar compra</h3>
-                <p class="insight-text">
-                    Los productos con stock muerto deben tratarse como prioridad operativa y comercial.
-                </p>
-            </div>
-        </div>
-
     </div>
+
+    <script>
+        (function () {{
+            function setFrameHeight() {{
+                const height = Math.ceil(document.documentElement.scrollHeight);
+                window.parent.postMessage({{ type: "streamlit:setFrameHeight", height: height }}, "*");
+            }}
+
+            window.addEventListener("load", setFrameHeight);
+            window.addEventListener("resize", setFrameHeight);
+
+            if ("ResizeObserver" in window) {{
+                new ResizeObserver(setFrameHeight).observe(document.body);
+            }}
+
+            setTimeout(setFrameHeight, 50);
+            setTimeout(setFrameHeight, 300);
+            setTimeout(setFrameHeight, 900);
+        }})();
+    </script>
 </body>
 </html>
 """
+
 # =========================
 # Render
 # =========================
@@ -948,6 +1266,6 @@ st.markdown(
 
 components.html(
     dashboard_html,
-    height=750,
+    height=820,          
     scrolling=False
 )
