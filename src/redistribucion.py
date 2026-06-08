@@ -35,17 +35,19 @@ REG_LABEL: dict[str, str] = {
 }
 
 GEO_LAYOUT = dict(
-    scope="north america",
-    projection_scale=4.8,
-    center=dict(lat=23.6, lon=-102.5),
-    showland=True,    landcolor="#f1f5f9",
-    showocean=True,   oceancolor="#dbeafe",
-    showlakes=True,   lakecolor="#dbeafe",
+    scope="world",
+    projection_type="natural earth",
+    showland=True,    landcolor="#e8f0e9",
+    showocean=True,   oceancolor="#cce4f7",
+    showlakes=True,   lakecolor="#cce4f7",
     showcountries=True,
-    countrycolor="rgba(100,116,139,.40)",
-    subunitcolor="rgba(100,116,139,.25)",
-    coastlinecolor="rgba(100,116,139,.25)",
-    bgcolor="#ffffff",
+    countrycolor="#94a3b8",
+    subunitcolor="rgba(148,163,184,.30)",
+    coastlinecolor="#94a3b8",
+    showrivers=True,  rivercolor="#cce4f7",
+    bgcolor="rgba(248,250,252,1)",
+    lonaxis=dict(range=[-118.5, -86.5]),
+    lataxis=dict(range=[14.0,   33.5]),
 )
 
 # UTILIDADES
@@ -85,9 +87,11 @@ def build_redist_base(
     """
     df = df_master.copy()
     if "Excess_stock" not in df.columns:
-        df["Excess_stock"] = (df["Stock"] - df["Units_sold"]).clip(lower=0)
+        _demand_col = "Units_expected" if "Units_expected" in df.columns else "Units_sold"
+        df["Excess_stock"] = (df["Stock"] - df[_demand_col]).clip(lower=0)
     if "Gap_pct" not in df.columns:
-        df["Gap_pct"] = (df["Excess_stock"] / df["Stock"].replace(0, np.nan) * 100)
+        _demand_col = "Units_expected" if "Units_expected" in df.columns else "Units_sold"
+        df["Gap_pct"] = ((df["Stock"] - df[_demand_col]) / df["Stock"].replace(0, np.nan) * 100)
 
     region_sub = (
         df.groupby(["Region","Category","Subcategory"])
@@ -194,9 +198,11 @@ def build_wave_plan(
     """
     df = df_master.copy()
     if "Excess_stock" not in df.columns:
-        df["Excess_stock"] = (df["Stock"] - df["Units_sold"]).clip(lower=0)
+        _demand_col = "Units_expected" if "Units_expected" in df.columns else "Units_sold"
+        df["Excess_stock"] = (df["Stock"] - df[_demand_col]).clip(lower=0)
     if "Gap_pct" not in df.columns:
-        df["Gap_pct"] = df["Excess_stock"] / df["Stock"].replace(0, np.nan) * 100
+        _demand_col = "Units_expected" if "Units_expected" in df.columns else "Units_sold"
+        df["Gap_pct"] = (df["Stock"] - df[_demand_col]) / df["Stock"].replace(0, np.nan) * 100
 
     # Fechas reales del forecast (días 1 y 15 de cada mes pronosticado)
     forecast_dates = get_forecast_dates(df, horizon)  # [01 Ene, 01 Feb, 01 Mar]
@@ -207,21 +213,26 @@ def build_wave_plan(
         oleada_dates.append(date(fd.year, fd.month, 15))      # día 15 del mes
 
     # Producto más débil por subcat+región (mayor Gap_pct = más sobrestock)
-    prod_region = (
-        df.groupby(["Product_id","Product_name","Category","Subcategory","Region"])
+    # Exceso del ÚLTIMO MES: refleja el inventario acumulado actual,
+    # no el promedio histórico diluido por meses con menos sobrestock.
+    last_month = df["YearMonth"].max()
+    df_last    = df[df["YearMonth"] == last_month]
+
+    prod_region_last = (
+        df_last.groupby(["Product_id","Product_name","Category","Subcategory","Region"])
         .agg(
-            avg_stock    = ("Stock",            "mean"),
-            avg_excess   = ("Excess_stock",     "mean"),
-            avg_sold     = ("Units_sold",        "mean"),
-            gap_pct      = ("Gap_pct",           "mean"),
-            sell_through = ("Sell_through_pct",  "mean"),
+            last_stock    = ("Stock",            "sum"),
+            last_excess   = ("Excess_stock",     "sum"),
+            last_sold     = ("Units_sold",        "sum"),
+            gap_pct       = ("Gap_pct",           "mean"),
+            sell_through  = ("Sell_through_pct",  "mean"),
         )
         .reset_index()
     )
 
     # Para cada subcat+región, el producto más débil = mayor gap_pct
     weakest = (
-        prod_region
+        prod_region_last
         .sort_values("gap_pct", ascending=False)
         .groupby(["Subcategory","Region"])
         .first()
@@ -245,20 +256,24 @@ def build_wave_plan(
     # Añadir el producto más débil del origen
     pares = pares.merge(
         weakest[["Subcategory","Region","Product_id","Product_name",
-                 "avg_excess","gap_pct","sell_through"]].rename(
+                 "last_excess","gap_pct","sell_through"]].rename(
             columns={"Region":"Region_origen",
-                     "avg_excess":"Excess_producto",
+                     "last_excess":"Excess_producto",
                      "gap_pct":"Gap_producto",
                      "sell_through":"Sell_through_origen"}),
         on=["Subcategory","Region_origen"],
         how="left",
     )
 
-    pares["Forecast_total_3m"] = pares["Forecast_avg"] * 3
+    # Total a transferir:
+    #   - Base: 80% del exceso ACTUAL del producto (último mes), no el promedio histórico
+    #   - Cap:  60% de la demanda forecast del destino (evita saturarlo)
+    # El exceso actual refleja inventario acumulado real, no diluido por el pasado.
+    pares["Forecast_total_3m"] = pares["Forecast_avg"] * horizon
     pares["Total_transferir"]  = pares.apply(
         lambda r: max(int(min(
-            r.get("Excess_producto", r["Avg_excess"]) * 0.50,
-            r["Forecast_total_3m"] * 0.35,
+            r.get("Excess_producto", r["Avg_excess"]) * 0.80,
+            r["Forecast_total_3m"] * 0.60,
         )), 0),
         axis=1,
     )
