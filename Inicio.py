@@ -349,9 +349,8 @@ st.markdown(
         .rd-bar-fill {
             height: 100%;
             border-radius: 999px;
-            background: linear-gradient(90deg, #ef4444, #991b1b);
+            background: #dc2626;
         }
-
         .rd-footer {
             color: #94a3b8;
             font-size: clamp(10px, 0.78vw, 12px);
