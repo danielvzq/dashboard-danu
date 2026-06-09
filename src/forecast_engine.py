@@ -3,13 +3,6 @@
 # DANUStore — Motor de Pronósticos
 # Carga de datos · Modelo Prophet · Cache
 # ══════════════════════════════════════════════════════════════════════
-#
-# Centraliza TODO lo relacionado con datos y predicción para que
-# 4_Pronosticos.py solo se encargue de la UI.
-#
-# Importar así desde cualquier página:
-#   from utils.forecast_engine import load_data, fit_prophet
-# ══════════════════════════════════════════════════════════════════════
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -20,50 +13,82 @@ import streamlit as st
 from prophet import Prophet
 
 
-
+# ══════════════════════════════════════════════════════════════════════
 # CARGA Y PREPARACIÓN DE DATOS
+# ══════════════════════════════════════════════════════════════════════
 
 @st.cache_data
 def load_data() -> pd.DataFrame:
     """
-    Lee df_Maestra.csv y agrega columnas derivadas necesarias
-    para el análisis de inventario y pronósticos.
+    Lee df_Maestra.csv y agrega columnas derivadas para análisis
+    de inventario y pronósticos.
 
-    Columnas añadidas
-    -----------------
+    Columnas nuevas
+    ---------------
     YearMonth       : período mensual (Period)
-    Excess_stock    : unidades sobrantes vs demanda planeada = max(Stock - Units_expected, 0)
-                      (se usa Units_expected en lugar de Units_sold para comparar contra
-                      lo planeado, no contra lo real; si la columna no existe, cae a Units_sold)
-    Gap_units       : Stock - Units_expected  (puede ser negativo = faltante)
-    Gap_pct         : Gap_units / Stock × 100
+
+    Excess_stock    : sobrestock real del mes, calculado con la fórmula:
+                        Stock − (Units_sold × 1.2)
+                      = Stock − (ventas reales + 20% buffer de seguridad)
+                      Se lee directamente de "Sobrestock crítico por MES"
+                      (ya viene calculada en el CSV con esa fórmula).
+                      Siempre ≥ 0 (nunca hay registro de déficit aquí).
+
+    Excedente       : presión acumulada de sobrestock mes a mes.
+                        Excedente_mes = Sobrestock_mes − Excedente_mes_anterior
+                      El primer registro de cada producto arranca en 0.
+                      Puede ser negativo (el sobrestock se está reduciendo)
+                      o positivo (el sobrestock está creciendo).
+                      Lee directamente la columna "Excedente" del CSV.
+
+    Gap_units       : unidades que NO están en sobrestock en ese mes
+                        = Stock − Excess_stock
+                      Equivale a la parte del stock "tolerada" = Units_sold × 1.2.
+                      Siempre positivo dado que Excess_stock ≤ Stock.
+
+    Gap_pct         : porcentaje del stock que está en sobrestock
+                        = Excess_stock / Stock × 100
+                      Refleja qué fracción del inventario supera la demanda
+                      esperada con su buffer. Rango típico: 68 % – 96 %.
     """
     df = pd.read_csv(
         "data/df_Maestra.csv",
         parse_dates=["Date"],
     )
-
     df.columns = df.columns.str.strip()
 
     df["YearMonth"] = df["Date"].dt.to_period("M")
 
-    # CORRECCIÓN: comparar contra demanda planeada (Units_expected), no ventas reales.
-    # Así el exceso refleja inventario no planeado, no simple diferencia de movimiento.
-    demand_col = "Units_expected" if "Units_expected" in df.columns else "Units_sold"
+    # ── Sobrestock real: usar la columna precalculada del CSV ──────────
+    # Fórmula original: Stock − (Units_sold × 1.2)
+    # La columna "Sobrestock crítico por MES" ya la implementa correctamente.
+    # No recalculamos para evitar diferencias de redondeo vs el CSV.
+    df["Excess_stock"] = pd.to_numeric(
+        df["Sobrestock crítico por MES"], errors="coerce"
+    ).clip(lower=0).fillna(0)
 
-    df["Excess_stock"] = (
-        df["Stock"] - df[demand_col]
-    ).clip(lower=0)
+    # ── Excedente acumulado: leer directamente del CSV ─────────────────
+    # Fórmula: Excedente_mes = Sobrestock_mes − Excedente_mes_anterior
+    # Primer registro de cada producto = 0.
+    # Negativo → sobrestock bajando; positivo → sobrestock creciendo.
+    df["Excedente"] = pd.to_numeric(
+        df["Excedente"], errors="coerce"
+    ).fillna(0)
 
-    df["Gap_units"] = df["Stock"] - df[demand_col]
+    # ── Gap: unidades fuera del sobrestock (parte "tolerada") ──────────
+    df["Gap_units"] = df["Stock"] - df["Excess_stock"]
 
+    # ── Gap porcentual: fracción del stock en sobrestock ───────────────
     df["Gap_pct"] = (
-        df["Gap_units"] / df["Stock"].replace(0, np.nan)
+        df["Excess_stock"] / df["Stock"].replace(0, np.nan)
     ) * 100
 
     return df
 
+
+# ══════════════════════════════════════════════════════════════════════
 # MODELO PROPHET
+# ══════════════════════════════════════════════════════════════════════
 
 @st.cache_data(show_spinner=False)
 def fit_prophet(
@@ -90,8 +115,8 @@ def fit_prophet(
     df = load_data()
 
     mask = (
-        (df["Region"] == region) &
-        (df[group_col] == group_val)
+        (df["Region"]    == region) &
+        (df[group_col]   == group_val)
     )
 
     sub = (
@@ -108,16 +133,13 @@ def fit_prophet(
     sub = sub[["ds", "y"]]
 
     model = Prophet(
-        changepoint_prior_scale=0.05,   # igual al notebook
+        changepoint_prior_scale=0.05,
         seasonality_mode="additive",
-        uncertainty_samples=300,        # igual al notebook
+        uncertainty_samples=300,
         yearly_seasonality=False,
         weekly_seasonality=False,
         daily_seasonality=False,
     )
-    # Estacionalidad semestral: fourier_order=1 con 12 meses (2 ciclos semestrales).
-    # fourier_order=3 agrega 6 parámetros para solo 12 puntos → riesgo de sobreajuste.
-    # Con >= 24 meses se puede aumentar a fourier_order=3 de forma segura.
     if len(sub) >= 12:
         model.add_seasonality(
             name="semestral",
@@ -126,16 +148,15 @@ def fit_prophet(
         )
 
     model.fit(sub)
-
-    future = model.make_future_dataframe(
-        periods=periods,
-        freq="MS",
-    )
+    future = model.make_future_dataframe(periods=periods, freq="MS")
     fc = model.predict(future)
 
     return sub, fc
 
-# FORECAST AGREGADO POR SUBCATEGORÍA (usado en KPIs)
+
+# ══════════════════════════════════════════════════════════════════════
+# FORECAST AGREGADO POR SUBCATEGORÍA (usado en KPIs del dashboard)
+# ══════════════════════════════════════════════════════════════════════
 
 def build_forecast_summary(
     df_filtrado: pd.DataFrame,
@@ -152,9 +173,7 @@ def build_forecast_summary(
 
     for sc in sorted(df_filtrado["Subcategory"].dropna().unique()):
 
-        hist, fc = fit_prophet(
-            "Subcategory", sc, region_prophet, horizon
-        )
+        hist, fc = fit_prophet("Subcategory", sc, region_prophet, horizon)
 
         if hist is None:
             continue
@@ -178,7 +197,10 @@ def build_forecast_summary(
 
     return pd.DataFrame(rows)
 
+
+# ══════════════════════════════════════════════════════════════════════
 # FORECAST POR SUBCATEGORÍA × REGIÓN (usado en redistribución)
+# ══════════════════════════════════════════════════════════════════════
 
 def build_subcat_region_forecast(
     df_master: pd.DataFrame,
@@ -200,9 +222,7 @@ def build_subcat_region_forecast(
     for sc in all_subcats:
         for rg in all_regions:
 
-            hist_tmp, fc_tmp = fit_prophet(
-                "Subcategory", sc, rg, horizon
-            )
+            hist_tmp, fc_tmp = fit_prophet("Subcategory", sc, rg, horizon)
 
             if hist_tmp is None or fc_tmp is None:
                 result[(sc, rg)] = 0.0
@@ -214,13 +234,15 @@ def build_subcat_region_forecast(
 
     return result
 
-# FORECAST POR REGIÓN (tarjeta mejor/peor región — no cambia con filtros)
+
+# ══════════════════════════════════════════════════════════════════════
+# FORECAST POR REGIÓN (tarjeta mejor/peor — no cambia con filtros)
+# ══════════════════════════════════════════════════════════════════════
 
 @st.cache_data(show_spinner=False)
 def build_region_forecast(horizon: int) -> pd.DataFrame:
     """
-    Corre Prophet para cada región usando el total de ventas mensuales
-    (todas las categorías y subcategorías sumadas).
+    Corre Prophet para cada región usando el total de ventas mensuales.
     No acepta filtros — siempre usa el dataset completo para que
     la tarjeta mejor/peor región sea estable e independiente de filtros.
 
@@ -248,14 +270,13 @@ def build_region_forecast(horizon: int) -> pd.DataFrame:
         sub = sub[["ds", "y"]]
 
         model = Prophet(
-            changepoint_prior_scale=0.05,   # igual al notebook
+            changepoint_prior_scale=0.05,
             seasonality_mode="additive",
-            uncertainty_samples=300,        # igual al notebook
+            uncertainty_samples=300,
             yearly_seasonality=False,
             weekly_seasonality=False,
             daily_seasonality=False,
         )
-        # Mismo criterio que fit_prophet — fourier_order adaptativo según historia.
         if len(sub) >= 12:
             model.add_seasonality(
                 name="semestral",
@@ -264,8 +285,8 @@ def build_region_forecast(horizon: int) -> pd.DataFrame:
             )
         model.fit(sub)
 
-        future   = model.make_future_dataframe(periods=horizon, freq="MS")
-        fc       = model.predict(future)
+        future    = model.make_future_dataframe(periods=horizon, freq="MS")
+        fc        = model.predict(future)
         future_fc = fc[fc["ds"] > sub["ds"].max()]
 
         hist_avg     = float(sub["y"].mean())
@@ -274,12 +295,16 @@ def build_region_forecast(horizon: int) -> pd.DataFrame:
         growth       = ((forecast_avg - hist_avg) / hist_avg * 100) if hist_avg > 0 else 0.0
 
         rows.append({
-            "Region":          region,
-            "Region_label":    REG_LABEL.get(region, region),
-            "Hist_avg":        hist_avg,
-            "Forecast_avg":    forecast_avg,
-            "Forecast_total":  forecast_tot,
-            "Growth_pct":      growth,
+            "Region":         region,
+            "Region_label":   REG_LABEL.get(region, region),
+            "Hist_avg":       hist_avg,
+            "Forecast_avg":   forecast_avg,
+            "Forecast_total": forecast_tot,
+            "Growth_pct":     growth,
         })
 
-    return pd.DataFrame(rows).sort_values("Forecast_total", ascending=False).reset_index(drop=True)
+    return (
+        pd.DataFrame(rows)
+        .sort_values("Forecast_total", ascending=False)
+        .reset_index(drop=True)
+    )

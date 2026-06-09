@@ -13,7 +13,11 @@ import streamlit as st
 from datetime import date
 from dateutil.relativedelta import relativedelta
 
+
+# ══════════════════════════════════════════════════════════════════════
 # CONSTANTES GEOGRÁFICAS
+# ══════════════════════════════════════════════════════════════════════
+
 REGION_COORDS: dict[str, dict] = {
     "bajío":                               {"lat": 20.88, "lon": -101.07, "city": "León"},
     "ciudad de méxico":                    {"lat": 19.43, "lon": -99.13,  "city": "CDMX"},
@@ -50,77 +54,143 @@ GEO_LAYOUT = dict(
     lataxis=dict(range=[14.0,   33.5]),
 )
 
+
+# ══════════════════════════════════════════════════════════════════════
 # UTILIDADES
+# ══════════════════════════════════════════════════════════════════════
 
 def haversine(lat1, lon1, lat2, lon2) -> int:
     R = 6371
     lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
-    a = (np.sin((lat2-lat1)/2)**2
-         + np.cos(lat1)*np.cos(lat2)*np.sin((lon2-lon1)/2)**2)
-    return int(2*R*np.arcsin(np.sqrt(a)))
+    a = (np.sin((lat2 - lat1) / 2) ** 2
+         + np.cos(lat1) * np.cos(lat2) * np.sin((lon2 - lon1) / 2) ** 2)
+    return int(2 * R * np.arcsin(np.sqrt(a)))
 
 
 def get_forecast_dates(df_master: pd.DataFrame, horizon: int) -> list[date]:
     """
     Devuelve las fechas reales del forecast: los N meses SIGUIENTES
     al último mes histórico en el dataset.
-    Ej: si el dataset termina en Dic 2025 → [Ene 2026, Feb 2026, Mar 2026]
     """
     last_month = df_master["YearMonth"].max().to_timestamp().date()
     dates = []
     for i in range(1, horizon + 1):
-        d = (last_month + relativedelta(months=i))
+        d = last_month + relativedelta(months=i)
         dates.append(date(d.year, d.month, 1))
     return dates
 
+
+def _ensure_overstock_cols(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Garantiza que el DataFrame tenga Excess_stock, Excedente y Gap_pct.
+
+    Prioridad de fuente:
+    1. Si ya existen (vienen de load_data()) → no hace nada.
+    2. Si existe "Sobrestock crítico por MES" → la usa directamente.
+    3. Fallback: Stock − Units_expected (proxy anterior).
+
+    Excess_stock : sobrestock absoluto del mes  = Sobrestock MES
+    Excedente    : presión acumulada (puede ser negativa)
+    Gap_pct      : Excess_stock / Stock × 100
+    """
+    df = df.copy()
+
+    # ── Excess_stock ──────────────────────────────────────────────────
+    if "Excess_stock" not in df.columns:
+        if "Sobrestock crítico por MES" in df.columns:
+            df["Excess_stock"] = (
+                pd.to_numeric(df["Sobrestock crítico por MES"], errors="coerce")
+                .clip(lower=0)
+                .fillna(0)
+            )
+        else:
+            # Fallback: diferencia simple vs demanda planeada
+            _demand = "Units_expected" if "Units_expected" in df.columns else "Units_sold"
+            df["Excess_stock"] = (df["Stock"] - df[_demand]).clip(lower=0)
+
+    # ── Excedente acumulado ───────────────────────────────────────────
+    if "Excedente" not in df.columns:
+        df["Excedente"] = pd.to_numeric(
+            df.get("Excedente", 0), errors="coerce"
+        ).fillna(0)
+    else:
+        df["Excedente"] = pd.to_numeric(df["Excedente"], errors="coerce").fillna(0)
+
+    # ── Gap_pct ───────────────────────────────────────────────────────
+    if "Gap_pct" not in df.columns:
+        df["Gap_pct"] = (
+            df["Excess_stock"] / df["Stock"].replace(0, np.nan)
+        ) * 100
+
+    return df
+
+
+# ══════════════════════════════════════════════════════════════════════
 # PASO 1 — CLASIFICAR REGIONES: ORIGEN / DESTINO / EQUILIBRIO
+# ══════════════════════════════════════════════════════════════════════
 
 def build_redist_base(
     df_master: pd.DataFrame,
-    subcat_region_forecast: dict[tuple[str,str], float],
+    subcat_region_forecast: dict[tuple[str, str], float],
     horizon: int = 3,
 ) -> pd.DataFrame:
     """
     Clasifica cada (Región, Subcategoría) como ORIGEN, DESTINO o Equilibrio.
-    Score_origen  = Gap_pct / Forecast_avg  → alto sobrestock, baja demanda
-    Score_destino = Forecast_avg / Avg_excess → alta demanda, poco exceso
+
+    Métricas usadas
+    ---------------
+    Avg_excess   : promedio mensual de "Sobrestock crítico por MES"
+                   = sobrestock real con buffer de ventas (Stock − Units_sold×1.2)
+                   Antes se usaba Stock − Units_expected, que subestimaba
+                   el sobrestock en ~7.6× al no considerar el buffer de ventas.
+
+    Avg_excedente: promedio del Excedente acumulado (solo positivos)
+                   Captura la TENDENCIA: valores altos → sobrestock creciente.
+
+    Gap_pct      : Excess_stock / Stock × 100
+                   % del inventario que está por encima de la demanda + buffer.
+                   Rango típico: 68 % – 96 % (antes era 7 % con el proxy antiguo).
+
+    Score_origen  = Gap_pct / Forecast_avg_mensual
+                   Alto Gap_pct y baja demanda → candidato fuerte a origen.
+
+    Score_destino = Forecast_avg / Avg_excess
+                   Alta demanda y bajo exceso propio → candidato fuerte a destino.
     """
-    df = df_master.copy()
-    if "Excess_stock" not in df.columns:
-        _demand_col = "Units_expected" if "Units_expected" in df.columns else "Units_sold"
-        df["Excess_stock"] = (df["Stock"] - df[_demand_col]).clip(lower=0)
-    if "Gap_pct" not in df.columns:
-        _demand_col = "Units_expected" if "Units_expected" in df.columns else "Units_sold"
-        df["Gap_pct"] = ((df["Stock"] - df[_demand_col]) / df["Stock"].replace(0, np.nan) * 100)
+    df = _ensure_overstock_cols(df_master)
 
     region_sub = (
-        df.groupby(["Region","Category","Subcategory"])
+        df.groupby(["Region", "Category", "Subcategory"])
         .agg(
-            Avg_stock    = ("Stock",            "mean"),
-            Avg_excess   = ("Excess_stock",     "mean"),
-            Avg_sold     = ("Units_sold",        "mean"),
-            Gap_pct      = ("Gap_pct",           "mean"),
-            Sell_through = ("Sell_through_pct",  "mean"),
+            Avg_stock     = ("Stock",         "mean"),
+            # Exceso real: promedio de Sobrestock MES (con buffer de ventas)
+            Avg_excess    = ("Excess_stock",  "mean"),
+            # Presión acumulada: promedio de Excedente positivo
+            # (refleja meses donde el sobrestock creció, no solo el nivel absoluto)
+            Avg_excedente = ("Excedente",     lambda x: x.clip(lower=0).mean()),
+            Avg_sold      = ("Units_sold",    "mean"),
+            Gap_pct       = ("Gap_pct",       "mean"),
+            Sell_through  = ("Sell_through_pct", "mean"),
         )
         .reset_index()
     )
 
-    # subcat_region_forecast devuelve la SUMA total del horizonte
-    # Dividimos por horizon para obtener el promedio MENSUAL
-    # (comparable con Avg_excess y Avg_sold que son promedios mensuales)
+    # Forecast por par (subcat, región): suma total del horizonte → ÷ horizon = mensual
     fc_rows = [
         {"Subcategory": k[0], "Region": k[1], "Forecast_total": v}
         for k, v in subcat_region_forecast.items()
     ]
     fc_df  = pd.DataFrame(fc_rows)
-    redist = region_sub.merge(fc_df, on=["Subcategory","Region"], how="left")
+    redist = region_sub.merge(fc_df, on=["Subcategory", "Region"], how="left")
     redist["Forecast_total"] = redist["Forecast_total"].fillna(0)
-    # Promedio mensual para comparar con métricas mensuales
-    redist["Forecast_avg"] = redist["Forecast_total"] / max(horizon, 1)
+    redist["Forecast_avg"]   = redist["Forecast_total"] / max(horizon, 1)
 
-    redist["Score_origen"]  = (
+    # Score_origen: usa Gap_pct real (68-96%) → discrimina mejor entre regiones
+    redist["Score_origen"] = (
         redist["Gap_pct"] / redist["Forecast_avg"].replace(0, np.nan)
     ).fillna(0)
+
+    # Score_destino: alta demanda relativa al exceso propio
     redist["Score_destino"] = (
         redist["Forecast_avg"] / redist["Avg_excess"].replace(0, np.nan)
     ).fillna(0)
@@ -134,15 +204,20 @@ def build_redist_base(
         es_o = row["Score_origen"]  >= p75_o
         es_d = row["Score_destino"] >= p75_d
         if es_o and es_d:
-            return "ORIGEN" if (row["Score_origen"]/max_o) > (row["Score_destino"]/max_d) else "DESTINO"
-        if es_o: return "ORIGEN"
-        if es_d: return "DESTINO"
+            return "ORIGEN" if (row["Score_origen"] / max_o) > (row["Score_destino"] / max_d) else "DESTINO"
+        if es_o:
+            return "ORIGEN"
+        if es_d:
+            return "DESTINO"
         return "Equilibrio"
 
     redist["Rol"] = redist.apply(rol, axis=1)
     return redist
 
-# PASO 2 — FORECAST MENSUAL DETALLADO (yhat por mes, no solo promedio)
+
+# ══════════════════════════════════════════════════════════════════════
+# PASO 2 — FORECAST MENSUAL DETALLADO
+# ══════════════════════════════════════════════════════════════════════
 
 @st.cache_data(show_spinner=False)
 def build_monthly_forecast(horizon: int) -> pd.DataFrame:
@@ -151,7 +226,7 @@ def build_monthly_forecast(horizon: int) -> pd.DataFrame:
     Necesario para distribuir oleadas proporcionalmente a la demanda.
     """
     from src.forecast_engine import load_data, fit_prophet
-    df = load_data()
+    df   = load_data()
     rows = []
     for reg in df["Region"].dropna().unique():
         for sc in df["Subcategory"].dropna().unique():
@@ -171,109 +246,124 @@ def build_monthly_forecast(horizon: int) -> pd.DataFrame:
                 })
     return pd.DataFrame(rows)
 
+
+# ══════════════════════════════════════════════════════════════════════
 # PASO 3 — PLAN DE OLEADAS A NIVEL PRODUCTO
-# Producto más débil = mayor Gap_pct en la región origen
-# Fechas = días 1 y 15 de cada mes del forecast real
+# ══════════════════════════════════════════════════════════════════════
 
 def build_wave_plan(
-    df_master:    pd.DataFrame,
-    redist_base:  pd.DataFrame,
-    fc_monthly:   pd.DataFrame,
-    horizon:      int = 3,
+    df_master:   pd.DataFrame,
+    redist_base: pd.DataFrame,
+    fc_monthly:  pd.DataFrame,
+    horizon:     int = 3,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Genera el plan de transferencias a nivel PRODUCTO con 6 oleadas.
 
-    Para cada par ORIGEN→DESTINO:
-      1. Identifica el producto más débil del origen en esa subcat
-         (mayor Gap_pct = más sobrestock relativo)
-      2. Calcula cuánto mover: min(exceso×50%, forecast_destino×35%)
-      3. Distribuye en 6 oleadas bisemanales proporcionales al yhat mensual
-      4. Fechas: días 1 y 15 de Ene, Feb, Mar 2026 (meses reales del forecast)
+    Lógica de selección de producto más débil
+    ------------------------------------------
+    Se usa el último mes disponible y se ordena por Gap_pct DESC
+    (mayor porcentaje de sobrestock sobre el stock total).
+    Gap_pct = Excess_stock / Stock × 100, donde Excess_stock = Sobrestock MES
+    (no el proxy anterior Stock − Units_expected).
 
-    Retorna
-    -------
-    pares_df : un registro por par con totales
-    plan_df  : un registro por oleada × par
+    Lógica del volumen a transferir
+    --------------------------------
+    Total_transferir = min(
+        Excedente_acumulado_positivo × 0.80,   ← presión real de sobrestock creciente
+        Sobrestock_MES_ultimo × 0.80,           ← techo: nivel absoluto de sobrestock
+        Forecast_total_destino × 0.60           ← cap: no saturar el destino
+    )
+
+    Por qué dos fuentes de exceso:
+    • Excedente (acumulado) captura la TENDENCIA: si crece mes a mes, la
+      urgencia de transferir es mayor que si el sobrestock es estable.
+    • Sobrestock MES (absoluto) evita transferir más de lo que el origen
+      tiene físicamente en exceso ese mes.
+    • El cap del 60 % del forecast del destino protege contra saturar
+      regiones que ya tienen demanda proyectada.
     """
-    df = df_master.copy()
-    if "Excess_stock" not in df.columns:
-        _demand_col = "Units_expected" if "Units_expected" in df.columns else "Units_sold"
-        df["Excess_stock"] = (df["Stock"] - df[_demand_col]).clip(lower=0)
-    if "Gap_pct" not in df.columns:
-        _demand_col = "Units_expected" if "Units_expected" in df.columns else "Units_sold"
-        df["Gap_pct"] = (df["Stock"] - df[_demand_col]) / df["Stock"].replace(0, np.nan) * 100
+    df = _ensure_overstock_cols(df_master)
 
     # Fechas reales del forecast (días 1 y 15 de cada mes pronosticado)
-    forecast_dates = get_forecast_dates(df, horizon)  # [01 Ene, 01 Feb, 01 Mar]
-    # Oleadas: día 1 y día 15 de cada mes forecast
-    oleada_dates = []
+    forecast_dates = get_forecast_dates(df, horizon)
+    oleada_dates   = []
     for fd in forecast_dates:
-        oleada_dates.append(fd)                               # día 1 del mes
-        oleada_dates.append(date(fd.year, fd.month, 15))      # día 15 del mes
+        oleada_dates.append(fd)
+        oleada_dates.append(date(fd.year, fd.month, 15))
 
-    # Producto más débil por subcat+región (mayor Gap_pct = más sobrestock)
-    # Exceso del ÚLTIMO MES: refleja el inventario acumulado actual,
-    # no el promedio histórico diluido por meses con menos sobrestock.
+    # ── Producto más débil: último mes disponible ─────────────────────
     last_month = df["YearMonth"].max()
     df_last    = df[df["YearMonth"] == last_month]
 
     prod_region_last = (
-        df_last.groupby(["Product_id","Product_name","Category","Subcategory","Region"])
+        df_last
+        .groupby(["Product_id", "Product_name", "Category", "Subcategory", "Region"])
         .agg(
-            last_stock    = ("Stock",            "sum"),
-            last_excess   = ("Excess_stock",     "sum"),
-            last_sold     = ("Units_sold",        "sum"),
-            gap_pct       = ("Gap_pct",           "mean"),
-            sell_through  = ("Sell_through_pct",  "mean"),
+            last_stock        = ("Stock",        "sum"),
+            last_excess       = ("Excess_stock", "sum"),   # Sobrestock MES
+            last_excedente    = ("Excedente",    "sum"),   # Excedente acumulado
+            last_sold         = ("Units_sold",   "sum"),
+            gap_pct           = ("Gap_pct",      "mean"),
+            sell_through      = ("Sell_through_pct", "mean"),
         )
         .reset_index()
     )
 
-    # Para cada subcat+región, el producto más débil = mayor gap_pct
+    # Producto más débil = mayor Gap_pct en la región origen
     weakest = (
         prod_region_last
         .sort_values("gap_pct", ascending=False)
-        .groupby(["Subcategory","Region"])
+        .groupby(["Subcategory", "Region"])
         .first()
         .reset_index()
     )
 
-    # Pares ORIGEN→DESTINO de redist_base
+    # ── Pares ORIGEN → DESTINO ────────────────────────────────────────
     origenes = redist_base[redist_base["Rol"] == "ORIGEN"][
-        ["Region","Category","Subcategory","Avg_excess","Gap_pct"]
+        ["Region", "Category", "Subcategory", "Avg_excess", "Avg_excedente", "Gap_pct"]
     ].copy()
     destinos = redist_base[redist_base["Rol"] == "DESTINO"][
-        ["Region","Category","Subcategory","Forecast_avg"]
+        ["Region", "Category", "Subcategory", "Forecast_avg"]
     ].copy()
 
     pares = origenes.merge(
-        destinos, on=["Category","Subcategory"],
-        suffixes=("_origen","_destino")
+        destinos, on=["Category", "Subcategory"],
+        suffixes=("_origen", "_destino")
     )
     pares = pares[pares["Region_origen"] != pares["Region_destino"]].copy()
 
     # Añadir el producto más débil del origen
     pares = pares.merge(
-        weakest[["Subcategory","Region","Product_id","Product_name",
-                 "last_excess","gap_pct","sell_through"]].rename(
-            columns={"Region":"Region_origen",
-                     "last_excess":"Excess_producto",
-                     "gap_pct":"Gap_producto",
-                     "sell_through":"Sell_through_origen"}),
-        on=["Subcategory","Region_origen"],
+        weakest[[
+            "Subcategory", "Region",
+            "Product_id", "Product_name",
+            "last_excess", "last_excedente",
+            "gap_pct", "sell_through"
+        ]].rename(columns={
+            "Region":          "Region_origen",
+            "last_excess":     "Excess_producto",      # Sobrestock MES del último mes
+            "last_excedente":  "Excedente_producto",   # Excedente acumulado del último mes
+            "gap_pct":         "Gap_producto",
+            "sell_through":    "Sell_through_origen",
+        }),
+        on=["Subcategory", "Region_origen"],
         how="left",
     )
 
-    # Total a transferir:
-    #   - Base: 80% del exceso ACTUAL del producto (último mes), no el promedio histórico
-    #   - Cap:  60% de la demanda forecast del destino (evita saturarlo)
-    # El exceso actual refleja inventario acumulado real, no diluido por el pasado.
-    pares["Forecast_total_3m"] = pares["Forecast_avg"] * horizon
+    # ── Total a transferir ────────────────────────────────────────────
+    # Base 1: Excedente acumulado positivo × 80 %
+    #   Refleja la PRESIÓN de sobrestock creciente; si el excedente
+    #   es negativo (sobrestock bajando) usa 0 para ese producto.
+    # Base 2: Sobrestock MES × 80 %
+    #   Techo físico: no se puede transferir más de lo que hay en sobrestock.
+    # Cap: 60 % de la demanda forecast del destino (no saturar).
+    pares["Forecast_total_h"]  = pares["Forecast_avg"] * horizon
     pares["Total_transferir"]  = pares.apply(
         lambda r: max(int(min(
-            r.get("Excess_producto", r["Avg_excess"]) * 0.80,
-            r["Forecast_total_3m"] * 0.60,
+            max(r.get("Excedente_producto", 0), 0) * 0.80,    # presión acumulada
+            r.get("Excess_producto", r["Avg_excess"]) * 0.80,  # techo sobrestock MES
+            r["Forecast_total_h"] * 0.60,                      # cap demanda destino
         )), 0),
         axis=1,
     )
@@ -288,7 +378,7 @@ def build_wave_plan(
         ), axis=1
     )
 
-    # Generar oleadas
+    # ── Generar oleadas ───────────────────────────────────────────────
     plan_rows = []
     for _, par in pares.iterrows():
         subcat  = par["Subcategory"]
@@ -315,15 +405,15 @@ def build_wave_plan(
             yhats.append(yhats[-1] if yhats else 0)
             labels.append(f"Mes {len(yhats)}")
 
-        total_yhat     = sum(yhats) if sum(yhats) > 0 else 1
-        oleada_units   = []
-        oleada_num     = 0
+        total_yhat   = sum(yhats) if sum(yhats) > 0 else 1
+        oleada_units = []
+        oleada_num   = 0
 
         for m_idx, (yhat_m, label_m) in enumerate(zip(yhats, labels)):
             peso_mes     = yhat_m / total_yhat
             unidades_mes = par["Total_transferir"] * peso_mes
 
-            for bisemana in range(2):   # 0 = día 1, 1 = día 15 del mes
+            for bisemana in range(2):
                 oleada_num += 1
                 fecha_real  = oleada_dates[m_idx * 2 + bisemana]
                 u           = round(unidades_mes / 2)
@@ -345,27 +435,31 @@ def build_wave_plan(
                     "Demanda_destino_mes":  round(yhat_m),
                     "Unidades_oleada":      u,
                     "Total_transferencia":  par["Total_transferir"],
-                    "Exceso_origen_u":      round(par.get("Excess_producto", par["Avg_excess"])),
+                    # ── Campos enriquecidos con nuevas variables ──────
+                    "Sobrestock_origen_u":  round(par.get("Excess_producto", par["Avg_excess"])),
+                    "Excedente_origen_u":   round(max(par.get("Excedente_producto", 0), 0)),
                     "Gap_origen_pct":       round(par.get("Gap_producto", par["Gap_pct"]), 1),
                     "Sell_through_origen":  round(par.get("Sell_through_origen", 0), 1),
                     "Distancia_km":         par["Distancia_km"],
                 })
 
-        # Ajuste de redondeo
+        # Ajuste de redondeo en la última oleada
         diff = par["Total_transferir"] - sum(oleada_units)
         if diff != 0 and plan_rows:
             plan_rows[-1]["Unidades_oleada"] += diff
 
-    plan_df = pd.DataFrame(plan_rows).sort_values(
-        ["Subcategoría","Origen","Destino","Oleada"]
-    ).reset_index(drop=True)
+    plan_df = (
+        pd.DataFrame(plan_rows)
+        .sort_values(["Subcategoría", "Origen", "Destino", "Oleada"])
+        .reset_index(drop=True)
+    )
 
     return pares, plan_df
 
+
+# ══════════════════════════════════════════════════════════════════════
 # TRAZAS DEL MAPA — un frame por oleada (6 frames fijos)
-# CLAVE para que la animación funcione:
-#   todos los frames deben tener EXACTAMENTE el mismo número de traces
-#   en el mismo orden. Usamos traces vacíos para los pares inactivos.
+# ══════════════════════════════════════════════════════════════════════
 
 def build_animation_frames(
     plan_df: pd.DataFrame,
@@ -373,15 +467,14 @@ def build_animation_frames(
 ) -> tuple:
     """
     Un frame por fila de plan_df, ordenado por Mes → Oleada → mayor total.
-
     Mapa inicia LIMPIO (sin líneas).
-    Cada frame muestra UNA ruta activa + annotation con datos de la transferencia.
-    Todos los frames tienen exactamente 2 traces (nodos + ruta) → animación fluida.
     """
     ordered = (
         plan_df
-        .sort_values(["Mes_num","Oleada","Total_transferencia"],
-                     ascending=[True, True, False])
+        .sort_values(
+            ["Mes_num", "Oleada", "Total_transferencia"],
+            ascending=[True, True, False]
+        )
         .reset_index(drop=True)
     )
 
@@ -407,6 +500,8 @@ def build_animation_frames(
 
         orig_label = REG_LABEL.get(row["Origen"], row["Origen"])
         dest_label = REG_LABEL.get(row["Destino"], row["Destino"])
+
+        # Anotación enriquecida: muestra Sobrestock y Excedente del origen
         annotation = dict(
             x=0.02, y=0.98,
             xref="paper", yref="paper",
@@ -418,6 +513,9 @@ def build_animation_frames(
                 f"Esta oleada: <b>{int(row['Unidades_oleada']):,} u</b><br>"
                 f"Total transferencia: {int(row['Total_transferencia']):,} u<br>"
                 f"Demanda destino: {int(row['Demanda_destino_mes']):,} u/mes<br>"
+                f"Sobrestock origen: {int(row.get('Sobrestock_origen_u', 0)):,} u<br>"
+                f"Excedente acumulado: {int(row.get('Excedente_origen_u', 0)):,} u<br>"
+                f"Gap origen: {row.get('Gap_origen_pct', 0):.1f}% del stock<br>"
                 f"Distancia: {int(row['Distancia_km']):,} km"
             ),
             bgcolor="rgba(255,255,255,0.92)",
@@ -436,7 +534,7 @@ def build_animation_frames(
             name=str(i),
             layout=go.Layout(
                 title_text=(
-                    f"Transferencia {i+1} de {n_total}  ·  "
+                    f"Transferencia {i + 1} de {n_total}  ·  "
                     f"Mes {int(row['Mes_num'])}  ·  "
                     f"Oleada {int(row['Oleada'])} de 6  ·  "
                     f"{row['Fecha_envío']}"
@@ -450,11 +548,11 @@ def build_animation_frames(
                 [str(i)],
                 dict(frame=dict(duration=1800, redraw=True), mode="immediate"),
             ],
-            label=row['Fecha_envío'],
+            label=row["Fecha_envío"],
             method="animate",
         ))
 
-    # Estado inicial: mapa LIMPIO, sin líneas
+    # Estado inicial: mapa limpio, sin líneas
     init_nodes = _make_nodes(set(), set())
     init_route = go.Scattergeo(
         lat=[None], lon=[None], mode="lines",
@@ -482,16 +580,20 @@ def build_animation_frames(
     return frames, slider_steps, init_nodes, [init_route], init_annotation, len(ordered)
 
 
+# ══════════════════════════════════════════════════════════════════════
+# NODOS DEL MAPA
+# ══════════════════════════════════════════════════════════════════════
+
 def _make_nodes(active_origins: set, active_dests: set) -> go.Scattergeo:
     regions = list(REGION_COORDS.keys())
     colors, sizes = [], []
     for r in regions:
         if r in active_origins:
-            colors.append("#ef4444"); sizes.append(22)   # rojo → envía (prioridad)
+            colors.append("#ef4444"); sizes.append(22)
         elif r in active_dests:
-            colors.append("#22c55e"); sizes.append(22)   # verde → recibe
+            colors.append("#22c55e"); sizes.append(22)
         else:
-            colors.append("#3b82f6"); sizes.append(14)   # azul → sin movimiento
+            colors.append("#3b82f6"); sizes.append(14)
     return go.Scattergeo(
         lat=[REGION_COORDS[r]["lat"] for r in regions],
         lon=[REGION_COORDS[r]["lon"] for r in regions],
@@ -501,7 +603,7 @@ def _make_nodes(active_origins: set, active_dests: set) -> go.Scattergeo:
         text=[REGION_COORDS[r]["city"] for r in regions],
         textposition="top center",
         textfont=dict(size=11, color="#0f172a"),
-        hovertext=[REG_LABEL.get(r,r) for r in regions],
+        hovertext=[REG_LABEL.get(r, r) for r in regions],
         hoverinfo="text",
         showlegend=False,
     )
