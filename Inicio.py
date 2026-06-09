@@ -490,24 +490,44 @@ st.markdown(
 # =========================
 # Funciones auxiliares
 # =========================
-def safe_mean(series):
-    value = (
-        pd.to_numeric(series, errors="coerce")
-        .replace([float("inf"), -float("inf")], pd.NA)
-        .dropna()
-        .mean()
-    )
-
-    if pd.isna(value):
-        return 0
-
-    return float(value)
-
-
 def safe_float(value, default=0):
-    if pd.isna(value):
+    try:
+        v = float(value)
+        return default if (v != v or v in (float("inf"), float("-inf"))) else v
+    except (TypeError, ValueError):
         return default
-    return float(value)
+
+
+def agg_dias_inventario(df):
+    """Días de inventario agregados: Stock_total / (Units_sold_total / 30)."""
+    stock = pd.to_numeric(df["Stock"], errors="coerce").sum()
+    sold  = pd.to_numeric(df["Units_sold"], errors="coerce").sum()
+    if sold == 0:
+        return 0
+    return float(stock / (sold / 30))
+
+
+def agg_rotacion(df):
+    """Rotación agregada: Units_sold_total / Stock_total."""
+    stock = pd.to_numeric(df["Stock"], errors="coerce").sum()
+    sold  = pd.to_numeric(df["Units_sold"], errors="coerce").sum()
+    if stock == 0:
+        return 0
+    return float(sold / stock)
+
+
+def agg_sell_through(df):
+    """Sell-through agregado: Units_sold_total / Units_expected_total * 100."""
+    expected = pd.to_numeric(df["Units_expected"], errors="coerce").sum()
+    sold     = pd.to_numeric(df["Units_sold"], errors="coerce").sum()
+    if expected == 0:
+        return 0
+    return float(sold / expected * 100)
+
+
+# Referencia fija: rotación máxima observada en el dataset completo
+# (se usa para normalizar la barra de progreso de rotación)
+ROT_MAX_DATASET = 0.5008
 
 
 # =========================
@@ -529,7 +549,8 @@ def cargar_datos():
         .fillna(False)
     )
 
-    df["Exceso_stock"] = (df["Stock"] - df["Units_expected"]).clip(lower=0)
+    # Asegurar que Excedente sea numérico
+    df["Excedente"] = pd.to_numeric(df["Excedente"], errors="coerce").fillna(0)
 
     return df
 
@@ -652,31 +673,40 @@ if acciones_seleccionadas:
 # =========================
 # Cálculos principales
 # =========================
-ventas_totales = df_filtrado["Sales_amount"].sum()
+ventas_totales  = df_filtrado["Sales_amount"].sum()
 unidades_vendidas = df_filtrado["Units_sold"].sum()
-stock_total = df_filtrado["Stock"].sum()
+stock_total     = df_filtrado["Stock"].sum()
 
+# Excedente total acumulado (incluye negativos = reducción real de sobrestock)
+unidades_excedentes = df_filtrado["Excedente"].sum()
+
+# SKUs críticos: conteo en el último mes del rango filtrado (más accionable)
+ultimo_mes_filtro = df_filtrado["Date"].max()
+df_ultimo_mes    = df_filtrado[df_filtrado["Date"] == ultimo_mes_filtro]
+skus_criticos    = df_ultimo_mes[df_ultimo_mes["Overstock_critico"] == True].shape[0]
+skus_total_mes   = df_ultimo_mes.shape[0]
+pct_skus_criticos = (skus_criticos / skus_total_mes * 100) if skus_total_mes > 0 else 0
+
+# Subconjunto crítico para métricas de comparación
 df_critico = df_filtrado[df_filtrado["Overstock_critico"] == True].copy()
-
-productos_criticos = df_critico["Product_id"].nunique()
-unidades_excedentes = df_critico["Exceso_stock"].sum()
 stock_critico = df_critico["Stock"].sum()
 
-porcentaje_stock_critico = (
-    stock_critico / stock_total * 100
-    if stock_total > 0
-    else 0
-)
+# Días de inventario — método agregado (evita distorsión del promedio simple)
+# Fórmula: Stock_total / (Units_sold_total / 30)
+dias_promedio_inventario = agg_dias_inventario(df_filtrado)
+dias_promedio_critico    = agg_dias_inventario(df_critico) if not df_critico.empty else 0
 
-dias_promedio_inventario = safe_mean(df_filtrado["Days_inventory"])
-dias_promedio_critico = safe_mean(df_critico["Days_inventory"]) if not df_critico.empty else 0
+# Rotación — método agregado: Units_sold_total / Stock_total
+rotacion_promedio = agg_rotacion(df_filtrado)
+rotacion_critica  = agg_rotacion(df_critico) if not df_critico.empty else 0
 
-rotacion_promedio = safe_mean(df_filtrado["Stock_turnover"])
-rotacion_critica = safe_mean(df_critico["Stock_turnover"]) if not df_critico.empty else 0
-
-progreso_overstock = safe_float(porcentaje_stock_critico)
-progreso_dias = min((dias_promedio_inventario / 365) * 100, 100)
-progreso_rotacion = min((rotacion_promedio / 1) * 100, 100)
+# Barras de progreso
+# · Overstock: % de SKUs críticos en el último mes del rango
+# · Días: techo = 365 (1 año de stock = situación límite)
+# · Rotación: normalizada contra el máximo real observado en el dataset
+progreso_overstock  = safe_float(pct_skus_criticos)
+progreso_dias       = min((dias_promedio_inventario / 365) * 100, 100)
+progreso_rotacion   = min((rotacion_promedio / ROT_MAX_DATASET) * 100, 100)
 
 
 # =========================
@@ -714,12 +744,17 @@ st.markdown(
 col1, col2, col3 = st.columns(3)
 
 with col1:
+    excedente_label = f"{unidades_excedentes:,.0f}"
+    excedente_desc  = (
+        f"{skus_criticos:,} de {skus_total_mes:,} SKUs críticos "
+        f"({pct_skus_criticos:.0f}%) en {ultimo_mes_filtro.strftime('%b %Y')}"
+    )
     st.markdown(
         compact_metric_card(
-            title="Overstock Crítico",
-            value=f"{unidades_excedentes:,.0f}",
+            title="Excedente Total de Stock",
+            value=excedente_label,
             unit="unidades excedentes",
-            description=f"{productos_criticos:,} productos",
+            description=excedente_desc,
             badge="Riesgo alto",
             icon="🚨",
             accent_color="#dc2626",
@@ -734,7 +769,7 @@ with col2:
             title="Días Prom. Inventario",
             value=f"{dias_promedio_inventario:.0f}",
             unit="días",
-            description=f"{dias_promedio_critico:.0f} días en productos críticos",
+            description=f"{dias_promedio_critico:.0f} días en SKUs con overstock crítico",
             badge="Inventario lento",
             icon="⏳",
             accent_color="#f59e0b",
@@ -747,9 +782,9 @@ with col3:
     st.markdown(
         compact_metric_card(
             title="Rotación Inventario",
-            value=f"{rotacion_promedio:.2f}x",
+            value=f"{rotacion_promedio:.3f}x",
             unit="",
-            description=f"{rotacion_critica:.2f}x en productos críticos",
+            description=f"{rotacion_critica:.3f}x en SKUs con overstock crítico",
             badge="Baja rotación",
             icon="🔄",
             accent_color="#2563eb",
@@ -855,11 +890,6 @@ st.markdown('<div class="rd-chart-bottom-gap" aria-hidden="true">&nbsp;</div>', 
 # =========================
 df_cards = df_filtrado.copy()
 
-if "Exceso_stock" not in df_cards.columns:
-    df_cards["Exceso_stock"] = (
-        df_cards["Stock"] - df_cards["Units_expected"]
-    ).clip(lower=0)
-
 ventas_filtradas_total = df_cards["Sales_amount"].sum()
 ventas_generales_total = df_maestra["Sales_amount"].sum()
 
@@ -869,16 +899,14 @@ porcentaje_ventas = (
     else 0
 )
 
-sell_through_rate = safe_mean(df_cards["Sell_through_pct"])
-
-if sell_through_rate <= 1:
-    sell_through_rate = sell_through_rate * 100
+# Sell-through agregado: sum(Units_sold) / sum(Units_expected) * 100
+sell_through_rate = agg_sell_through(df_cards)
 
 ventas_unidades_totales = df_cards["Units_sold"].sum()
 
 
 # =========================
-# Top 5 productos con mayor sobrestock
+# Top 5 productos con mayor excedente acumulado
 # =========================
 col_producto = "Product_name" if "Product_name" in df_cards.columns else "Product_id"
 
@@ -891,25 +919,27 @@ if col_producto == "Product_name" and "Product_id" in df_cards.columns:
 else:
     df_cards["Etiqueta_producto"] = df_cards[col_producto].astype(str)
 
+# ─── CAMBIO: agrupar por Excedente en lugar de Exceso_stock ──────────────────
 top5_sobrestock = (
     df_cards
-    .groupby("Etiqueta_producto", as_index=False)["Exceso_stock"]
+    .groupby("Etiqueta_producto", as_index=False)["Excedente"]
     .sum()
-    .sort_values("Exceso_stock", ascending=False)
+    .sort_values("Excedente", ascending=False)
     .head(5)
 )
 
 max_sobrestock = (
-    top5_sobrestock["Exceso_stock"].max()
+    top5_sobrestock["Excedente"].max()
     if not top5_sobrestock.empty
     else 1
 )
+# ─────────────────────────────────────────────────────────────────────────────
 
 top5_items_html = ""
 
 for _, row in top5_sobrestock.iterrows():
     producto_item = escape(str(row["Etiqueta_producto"]))
-    exceso = row["Exceso_stock"]
+    exceso = row["Excedente"]  # ← columna Excedente
     porcentaje_barra = (exceso / max_sobrestock) * 100 if max_sobrestock > 0 else 0
 
     top5_items_html += (
@@ -946,9 +976,9 @@ side_panel_html = (
     f'</div>'
     f'</div>'
     f'<div class="rd-ranking">'
-    f'<p class="rd-ranking-title">Top 5 productos con mayor sobrestock</p>'
+    f'<p class="rd-ranking-title">Top 5 productos con mayor excedente acumulado</p>'
     f'{top5_items_html}'
-    f'<p class="rd-footer">Medido por unidades excedentes de stock.</p>'
+    f'<p class="rd-footer">Medido por excedente acumulado de stock (columna Excedente).</p>'
     f'</div>'
     f'</div>'
     f'</div>'
