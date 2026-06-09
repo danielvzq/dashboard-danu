@@ -161,7 +161,7 @@ st.markdown(
 
         .rd-top-description {
             color: var(--rd-muted) !important;
-            font-size: 12px !important;
+            font-size: 14px !important;
             font-weight: 750 !important;
             letter-spacing: 0 !important;
             line-height: 1.22 !important;
@@ -236,7 +236,7 @@ st.markdown(
 
         .rd-chart-header h3 {
             color: var(--rd-text) !important;
-            font-size: 17px !important;
+            font-size: 24px !important;
             font-weight: 950 !important;
             letter-spacing: -0.25px !important;
             line-height: 1.16 !important;
@@ -245,7 +245,7 @@ st.markdown(
 
         .rd-chart-header p {
             color: var(--rd-muted) !important;
-            font-size: 12px !important;
+            font-size: 16px !important;
             font-weight: 750 !important;
             line-height: 1.25 !important;
             margin: 8px 0 0 0 !important;
@@ -309,7 +309,7 @@ st.markdown(
 
         .rd-small-kpi-label {
             color: var(--rd-muted);
-            font-size: 9px !important;
+            font-size: 18px !important;
             font-weight: 950;
             text-transform: uppercase;
             white-space: nowrap;
@@ -363,6 +363,7 @@ st.markdown(
         }
 
         .rd-product-name {
+            font-size: 14px !important;
             min-width: 0;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -788,7 +789,7 @@ with col1:
         compact_metric_card(
             title="Excedente Total de Stock",
             value=excedente_label,
-            unit="unidades excedentes",
+            unit="unidades",
             description=excedente_desc,
             badge="Riesgo alto",
             icon="🚨",
@@ -804,7 +805,7 @@ with col2:
             title="Días Prom. Inventario",
             value=f"{dias_promedio_inventario:.0f}",
             unit="días",
-            description=f"{dias_promedio_critico:.0f} días en SKUs con overstock crítico",
+            description=f"{dias_promedio_critico:.0f} en productos críticos",
             badge="Inventario lento",
             icon="⏳",
             accent_color="#f59e0b",
@@ -819,7 +820,7 @@ with col3:
             title="Rotación Inventario",
             value=f"{rotacion_promedio:.3f}x",
             unit="",
-            description=f"{rotacion_critica:.3f}x en SKUs con overstock crítico",
+            description=f"{rotacion_critica:.3f}x en productos críticos",
             badge="Baja rotación",
             icon="🔄",
             accent_color="#2563eb",

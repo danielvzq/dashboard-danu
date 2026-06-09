@@ -501,7 +501,7 @@ dashboard_html = f"""
         --rd-card-bg: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
         --rd-card-border: 1.7px solid rgba(100, 116, 139, 0.52);
         --rd-card-border-hover: rgba(71, 85, 105, 0.62);
-        --rd-card-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+  
         --rd-card-radius: clamp(18px, 1.55vw, 24px);
         --rd-inner-border: 1.4px solid rgba(100, 116, 139, 0.38);
         --rd-inner-shadow: 0 6px 16px rgba(15, 23, 42, 0.035);
@@ -836,7 +836,7 @@ dashboard_html = f"""
 
     .insight-label {{
         color: #64748b;
-        font-size: clamp(9px, 0.72vw, 10.5px);
+        font-size: clamp(20px, 0.72vw, 24px);
         font-weight: 950;
         text-transform: uppercase;
         margin: 0 0 clamp(6px, 0.5vw, 8px) 0;
@@ -856,7 +856,7 @@ dashboard_html = f"""
 
     .insight-text {{
         color: #64748b;
-        font-size: clamp(10px, 0.82vw, 11.5px);
+        font-size: clamp(12px, 0.82vw, 16.5px);
         font-weight: 750;
         line-height: 1.3;
         margin: 0;
