@@ -134,7 +134,7 @@ st.markdown(
             column-gap: 7px !important;
             row-gap: 2px !important;
             color: var(--rd-text) !important;
-            font-size: 39px !important;
+            font-size: 32px !important;
             font-weight: 950 !important;
             letter-spacing: -1.15px !important;
             line-height: 0.98 !important;
@@ -152,7 +152,7 @@ st.markdown(
 
         .rd-top-unit {
             color: var(--rd-text) !important;
-            font-size: 15px !important;
+            font-size: 32px !important;
             font-weight: 950 !important;
             letter-spacing: -0.25px !important;
             line-height: 1.05 !important;
@@ -481,6 +481,41 @@ st.markdown(
             .rd-top-unit { font-size: 15px !important; }
             .rd-top-description { font-size: 12px !important; }
         }
+
+       /* =====================================================
+   TARJETA DE LA GRÁFICA
+   El borde real se aplica al stVerticalBlock interno,
+   que es el elemento que estás señalando en DevTools.
+===================================================== */
+
+/* El wrapper externo ya no dibuja el borde */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.rd-chart-anchor) {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+}
+
+/* ESTE es el elemento que quieres cambiar */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.rd-chart-anchor)
+div[data-testid="stVerticalBlock"] {
+    box-sizing: border-box !important;
+       border: 2px solid rgba(100, 116, 139, 0.55) !important;
+    border-radius: var(--rd-card-radius) !important;
+    background: var(--rd-soft-bg) !important;
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06) !important;
+    padding: 15px !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+}
+
+/* Hover opcional */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.rd-chart-anchor)
+div[data-testid="stVerticalBlock"]:hover {
+    border-color: rgba(71, 85, 105, 0.62) !important;
+}
     </style>
     """,
     unsafe_allow_html=True

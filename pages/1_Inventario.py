@@ -497,6 +497,16 @@ dashboard_html = f"""
         box-sizing: border-box;
     }}
 
+    :root {{
+        --rd-card-bg: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        --rd-card-border: 1.7px solid rgba(100, 116, 139, 0.52);
+        --rd-card-border-hover: rgba(71, 85, 105, 0.62);
+        --rd-card-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+        --rd-card-radius: clamp(18px, 1.55vw, 24px);
+        --rd-inner-border: 1.4px solid rgba(100, 116, 139, 0.38);
+        --rd-inner-shadow: 0 6px 16px rgba(15, 23, 42, 0.035);
+    }}
+
     .dashboard-shell {{
         width: 100%;
         max-width: 1500px;
@@ -524,13 +534,13 @@ dashboard_html = f"""
 
     .kpi-card {{
         position: relative;
-        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        border: 1px solid rgba(148, 163, 184, 0.24);
-        border-radius: clamp(18px, 1.55vw, 24px);
+        background: var(--rd-card-bg);
+        border: var(--rd-card-border);
+        border-radius: var(--rd-card-radius);
         padding: clamp(14px, 1.35vw, 22px) clamp(14px, 1.45vw, 22px) clamp(12px, 1.05vw, 18px);
         height: 100%;
         min-height: 0;
-        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.035);
+        box-shadow: var(--rd-card-shadow);
         overflow: hidden;
         display: flex;
         flex-direction: column;
@@ -603,13 +613,13 @@ dashboard_html = f"""
     }}
 
     .panel {{
-        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        border: 1px solid rgba(148, 163, 184, 0.24);
-        border-radius: clamp(18px, 1.55vw, 24px);
+        background: var(--rd-card-bg);
+        border: var(--rd-card-border);
+        border-radius: var(--rd-card-radius);
         padding: clamp(13px, 1.18vw, 18px) clamp(16px, 1.45vw, 22px);
         height: 100%;
         min-height: 0;
-        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.035);
+        box-shadow: var(--rd-card-shadow);
         overflow: hidden;
         display: flex;
         flex-direction: column;
@@ -727,8 +737,9 @@ dashboard_html = f"""
 
     .dead-mini {{
         background: rgba(255, 255, 255, 0.9);
-        border: 1px solid rgba(148, 163, 184, 0.24);
+        border: var(--rd-inner-border);
         border-radius: clamp(14px, 1.2vw, 18px);
+        box-shadow: var(--rd-inner-shadow);
         padding: clamp(9px, 0.88vw, 12px) clamp(12px, 1.05vw, 16px);
         overflow: hidden;
     }}
@@ -810,13 +821,13 @@ dashboard_html = f"""
     }}
 
     .insight {{
-        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        border: 1px solid rgba(148, 163, 184, 0.24);
-        border-radius: clamp(18px, 1.55vw, 24px);
+        background: var(--rd-card-bg);
+        border: var(--rd-card-border);
+        border-radius: var(--rd-card-radius);
         padding: clamp(13px, 1.18vw, 18px) clamp(16px, 1.45vw, 22px);
         height: 100%;
         min-height: 0;
-        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.035);
+        box-shadow: var(--rd-card-shadow);
         overflow: hidden;
         display: flex;
         flex-direction: column;
@@ -853,6 +864,16 @@ dashboard_html = f"""
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
+    }}
+
+    .kpi-card:hover,
+    .panel:hover,
+    .insight:hover {{
+        border-color: var(--rd-card-border-hover);
+    }}
+
+    .dead-mini:hover {{
+        border-color: rgba(71, 85, 105, 0.55);
     }}
 
     @media (max-width: 1180px) {{

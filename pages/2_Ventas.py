@@ -25,6 +25,14 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+        :root {
+            --rd-card-bg: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            --rd-card-border: 1.7px solid rgba(100, 116, 139, 0.52);
+            --rd-card-border-hover: rgba(71, 85, 105, 0.62);
+            --rd-card-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+            --rd-card-radius: 24px;
+        }
+
         .block-container {
             padding-top: 2.2rem !important;
             padding-bottom: 0.8rem !important;
@@ -79,12 +87,40 @@ st.markdown(
             margin: 6px 0 0 0;
         }
 
-        [data-testid="stVerticalBlockBorderWrapper"] {
-            border-radius: 24px !important;
-            border: 1px solid rgba(148, 163, 184, 0.22) !important;
-            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
-            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.035) !important;
-            padding: 0.4rem 0.6rem !important;
+        .chart-card-anchor {
+            display: none !important;
+        }
+
+        /*
+           Tarjetas de gráficas.
+           El borde visible se aplica al stVerticalBlock interno,
+           que es el elemento que Streamlit realmente dibuja dentro
+           de st.container(border=True).
+        */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.chart-card-anchor) {
+            border: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            overflow: visible !important;
+        }
+
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.chart-card-anchor) > div[data-testid="stVerticalBlock"],
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.chart-card-anchor) > div > div[data-testid="stVerticalBlock"] {
+            box-sizing: border-box !important;
+            border: var(--rd-card-border) !important;
+            border-radius: var(--rd-card-radius) !important;
+            background: var(--rd-card-bg) !important;
+            box-shadow: var(--rd-card-shadow) !important;
+            padding: 15px !important;
+            margin: 0 !important;
+            overflow: hidden !important;
+        }
+
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.chart-card-anchor) > div[data-testid="stVerticalBlock"]:hover,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.chart-card-anchor) > div > div[data-testid="stVerticalBlock"]:hover {
+            border-color: var(--rd-card-border-hover) !important;
         }
     </style>
     """,
@@ -134,7 +170,14 @@ def compact_metric_card(title, value, description, accent_color):
         border-radius: 24px;
         padding: 26px 20px 18px 20px;
         background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        border: 1px solid rgba(148, 163, 184, 0.28);
+        border: 1.7px solid rgba(100, 116, 139, 0.52);
+        box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+        transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }}
+
+    .metric-card:hover {{
+        border-color: rgba(71, 85, 105, 0.62);
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.075);
     }}
 
     .metric-card::before {{
@@ -479,6 +522,7 @@ with tab1:
 
     with col_c1:
         with st.container(border=True):
+            st.markdown('<div class="chart-card-anchor" aria-hidden="true"></div>', unsafe_allow_html=True)
             st.markdown(
                 chart_header(
                     "Categorías por perfil de comprador",
@@ -522,6 +566,7 @@ with tab1:
 
     with col_c2:
         with st.container(border=True):
+            st.markdown('<div class="chart-card-anchor" aria-hidden="true"></div>', unsafe_allow_html=True)
             st.markdown(
                 chart_header(
                     "Concentración geográfica por segmento",
@@ -580,6 +625,7 @@ with tab1:
 
 with tab2:
     with st.container(border=True):
+        st.markdown('<div class="chart-card-anchor" aria-hidden="true"></div>', unsafe_allow_html=True)
         st.markdown(
             chart_header(
                 "Evolución anual de subcategorías",
