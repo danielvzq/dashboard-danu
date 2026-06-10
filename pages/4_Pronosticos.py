@@ -49,7 +49,6 @@ st.markdown(
     """
     <style>
         :root {
-            /* Mismo posicionamiento base que Inicio.py */
             --rd-page-x: clamp(1rem, 1.9vw, 1.6rem);
             --rd-page-top: clamp(1.4rem, 2vh, 2.2rem);
 
@@ -58,8 +57,7 @@ st.markdown(
             --rd-card-border-hover: rgba(71, 85, 105, 0.62);
             --rd-card-radius: clamp(18px, 1.55vw, 24px);
             --rd-inner-border: 1.4px solid rgba(100, 116, 139, 0.38);
-            --rd-card-shadow: 0 8px 24px rgba(15, 23, 42, 0.035);
-            --rd-inner-shadow: 0 6px 16px rgba(15, 23, 42, 0.035);
+        
             --rd-gap: clamp(8px, 0.82vw, 12px);
         }
 
@@ -946,8 +944,7 @@ ctx_parts.append(f"{horizon} meses")
 ctx_str = "  ·  ".join(ctx_parts)
 
 st.markdown(
-    f'<div class="rd-main-title">Panel de Pronósticos</div>'
-    f'<p class="forecast-context">{escape(str(region_label))}  ·  {escape(str(ctx_str))}</p>',
+    f'<div class="rd-main-title">Panel de Pronósticos</div>',
     unsafe_allow_html=True
 )
 
@@ -1028,7 +1025,7 @@ with tab_resumen:
             ),
         ))
 
-        fig_bar.add_vline(x=ref15, line=dict(color="#f59e0b", width=2.5, dash="dot"))
+        fig_bar.add_vline(x=ref15, line=dict(color="#ef3d3d", width=2.5, dash="dot"))
         fig_bar.add_vline(x=ref25, line=dict(color="#0138FF", width=2.5, dash="dot"))
 
         fig_bar.add_annotation(
@@ -1114,7 +1111,7 @@ with col_acc:
                 "<span style='font-size:11px;color:#64748b'>"
                 "Walk-forward · histórico</span>"
             ),
-            x=0.2, y=1.0, xref="paper", yref="paper",
+            x=0.15, y=1.0, xref="paper", yref="paper",
             showarrow=False, align="center",
             font=dict(size=15, color="#0f172a", family="Inter, system-ui, sans-serif")
         )]
