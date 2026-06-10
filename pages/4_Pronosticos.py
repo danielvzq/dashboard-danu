@@ -43,13 +43,25 @@ st.set_page_config(
 
 
 # =========================
-# CSS general compacto
+# CSS general responsivo
 # =========================
 st.markdown(
     """
     <style>
+        :root {
+            --rd-card-bg: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            --rd-card-border: 1.7px solid rgba(100, 116, 139, 0.52);
+            --rd-card-border-hover: rgba(71, 85, 105, 0.62);
+            --rd-card-radius: clamp(18px, 1.55vw, 24px);
+            --rd-inner-border: 1.4px solid rgba(100, 116, 139, 0.38);
+            --rd-card-shadow: 0 8px 24px rgba(15, 23, 42, 0.035);
+            --rd-inner-shadow: 0 6px 16px rgba(15, 23, 42, 0.035);
+            --rd-gap: clamp(8px, 0.82vw, 12px);
+        }
+
         .block-container {
-            padding-top: clamp(1.4rem, 2vh, 2.2rem) !important;
+            /* Más aire superior para que el header fijo de Streamlit no corte el título */
+            padding-top: clamp(2.15rem, 3.2vh, 3.2rem) !important;
             padding-bottom: clamp(0.8rem, 1.4vh, 1.2rem) !important;
             padding-left: clamp(1rem, 1.9vw, 1.6rem) !important;
             padding-right: clamp(1rem, 1.9vw, 1.6rem) !important;
@@ -58,7 +70,6 @@ st.markdown(
 
         h1, h2, h3, h4 {
             margin-top: 0 !important;
-            margin-bottom: 0.4rem !important;
         }
 
         .main-title {
@@ -66,108 +77,258 @@ st.markdown(
             font-size: clamp(2rem, 3.35vw, 3.25rem);
             font-weight: 950;
             letter-spacing: clamp(-1.4px, -0.12vw, -0.7px);
-            margin: 0 0 clamp(1rem, 1.6vw, 1.5rem) 0;
-            line-height: 1.05;
+            margin: 0 0 clamp(0.55rem, 0.9vw, 0.85rem) 0;
+            line-height: 1.18;
+            padding-top: 0.08em;
+            overflow: visible;
         }
 
         .forecast-context {
             color: #64748b;
-            font-size: 12px;
-            font-weight: 700;
-            margin: 0 0 6px 0;
+            font-size: clamp(11px, 0.9vw, 13px);
+            font-weight: 800;
+            margin: 0 0 clamp(0.7rem, 1.1vw, 1rem) 0;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
-        /* Eliminar el gap que Streamlit agrega entre el header y los tabs */
         div[data-testid="stVerticalBlock"] {
-            gap: 0.4rem !important;
+            gap: clamp(0.5rem, 0.8vw, 0.75rem) !important;
         }
 
         div[data-testid="stHorizontalBlock"] {
-            gap: 0.8rem !important;
+            gap: clamp(0.55rem, 0.85vw, 0.8rem) !important;
         }
 
-        /* Colapsar el espacio del elemento que envuelve el título */
-        div[data-testid="stMarkdownContainer"]:has(.main-title) {
-            margin-bottom: 0 !important;
-            padding-bottom: 0 !important;
-        }
-
+        div[data-testid="stMarkdownContainer"]:has(.main-title),
         div[data-testid="stMarkdownContainer"]:has(.forecast-context) {
             margin-bottom: 0 !important;
             padding-bottom: 0 !important;
         }
 
-        /* Reducir el padding superior de los tabs */
         div[data-testid="stTabs"] {
             margin-top: 0 !important;
         }
 
         button[data-baseweb="tab"] {
-            padding-top: 6px !important;
-            padding-bottom: 6px !important;
+            padding-top: 7px !important;
+            padding-bottom: 7px !important;
+            border-radius: 999px !important;
+            font-weight: 850 !important;
+        }
+
+        button[kind="secondary"] {
+            border-radius: 999px !important;
+            font-weight: 850 !important;
         }
 
         iframe {
             display: block;
+            width: 100% !important;
+            max-width: 100% !important;
         }
 
         .chart-card-header {
-            padding: 4px 8px 0 8px;
-            margin-bottom: 6px;
+            padding: 0;
+            margin-bottom: clamp(9px, 0.85vw, 13px);
         }
 
         .chart-card-header h3 {
             color: #0f172a;
-            font-size: 22px;
-            font-weight: 900;
+            font-size: clamp(16px, 1.25vw, 21px);
+            font-weight: 950;
             margin: 0;
-            letter-spacing: -0.4px;
+            letter-spacing: -0.25px;
+            line-height: 1.22;
         }
 
         .chart-card-header p {
             color: #64748b;
-            font-size: 14px;
-            font-weight: 600;
-            margin: 6px 0 0 0;
-            line-height: 1.35;
+            font-size: clamp(11px, 0.88vw, 13px);
+            font-weight: 800;
+            margin: clamp(4px, 0.45vw, 7px) 0 0 0;
+            line-height: 1.25;
+        }
+
+        .section-title-spacer {
+            height: clamp(4px, 0.45vw, 7px);
+            min-height: 4px;
+        }
+
+        .redist-map-spacer {
+            height: clamp(24px, 1.75vw, 32px);
+            min-height: 24px;
+        }
+
+        /* Streamlit agrega demasiado aire en los divider; aquí lo compactamos. */
+        hr {
+            margin: clamp(1rem, 1.35vw, 1.45rem) 0 !important;
+        }
+
+        div[data-testid="stPlotlyChart"] iframe,
+        div[data-testid="stPlotlyChart"] > div {
+            overflow: visible !important;
+        }
+
+        [data-testid="stVerticalBlockBorderWrapper"],
+        div[data-testid="stPlotlyChart"],
+        div[data-testid="stDataFrame"] {
+            border-radius: var(--rd-card-radius) !important;
+            border: var(--rd-card-border) !important;
+            background: var(--rd-card-bg) !important;
+            box-shadow: var(--rd-card-shadow) !important;
+            overflow: hidden !important;
         }
 
         [data-testid="stVerticalBlockBorderWrapper"] {
-            border-radius: 24px !important;
-            border: 1px solid rgba(148, 163, 184, 0.22) !important;
-            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
-            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.035) !important;
-            padding: 0.4rem 0.6rem !important;
+            padding: clamp(0.5rem, 0.85vw, 0.8rem) !important;
         }
 
         div[data-testid="stPlotlyChart"] {
-            border-radius: 24px !important;
-            border: 1px solid rgba(148, 163, 184, 0.22) !important;
-            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
-            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.035) !important;
-            padding: 0.45rem 0.65rem !important;
+            padding: clamp(0.45rem, 0.7vw, 0.65rem) clamp(0.55rem, 0.85vw, 0.8rem) clamp(0.55rem, 0.85vw, 0.8rem) !important;
+        }
+
+        div[data-testid="stPlotlyChart"] > div {
+            width: 100% !important;
         }
 
         div[data-testid="stMetric"] {
-            border-radius: 18px !important;
-            border: 1px solid rgba(148, 163, 184, 0.22) !important;
-            background: rgba(255, 255, 255, 0.88) !important;
-            padding: 0.65rem 0.75rem !important;
+            border-radius: clamp(14px, 1.2vw, 18px) !important;
+            border: var(--rd-inner-border) !important;
+            background: rgba(255, 255, 255, 0.9) !important;
+            box-shadow: var(--rd-inner-shadow) !important;
+            padding: clamp(0.55rem, 0.8vw, 0.75rem) clamp(0.65rem, 0.95vw, 0.85rem) !important;
         }
 
         div[data-testid="stDataFrame"] {
-            border-radius: 20px !important;
-            overflow: hidden !important;
-            border: 1px solid rgba(148, 163, 184, 0.22) !important;
             background: #ffffff !important;
         }
 
-        button[kind="secondary"], button[data-baseweb="tab"] {
+        div[data-testid="stPlotlyChart"]:hover,
+        div[data-testid="stDataFrame"]:hover,
+        [data-testid="stVerticalBlockBorderWrapper"]:hover,
+        div[data-testid="stMetric"]:hover {
+            border-color: var(--rd-card-border-hover) !important;
+        }
+
+        [data-testid="stExpander"],
+        [data-testid="stPopover"] {
+            font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        div[data-testid="stPopover"] button {
+            min-width: 105px !important;
+            height: 38px !important;
+            white-space: nowrap !important;
             border-radius: 999px !important;
             font-weight: 800 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 0 clamp(12px, 1vw, 16px) !important;
+        }
+
+        div[data-testid="stRadio"] label {
+            font-weight: 800 !important;
+        }
+
+        @media (max-width: 1180px) {
+            .block-container {
+                padding-left: clamp(0.85rem, 1.6vw, 1.2rem) !important;
+                padding-right: clamp(0.85rem, 1.6vw, 1.2rem) !important;
+            }
+
+            .chart-card-header h3 {
+                font-size: clamp(13px, 1.65vw, 17px);
+            }
+
+            .chart-card-header p {
+                font-size: clamp(9.5px, 1.15vw, 12px);
+            }
+
+            div[data-testid="stPlotlyChart"] {
+                padding: 0.55rem 0.65rem !important;
+            }
+        }
+
+        @media (max-width: 820px) {
+            .block-container {
+                padding-left: 0.75rem !important;
+                padding-right: 0.75rem !important;
+                padding-top: 1.35rem !important;
+            }
+
+            .main-title {
+                font-size: clamp(1.7rem, 8vw, 2.35rem);
+                margin-bottom: 0.55rem;
+            }
+
+            .forecast-context {
+                font-size: clamp(9.5px, 2.4vw, 12px);
+                white-space: normal;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+            }
+
+            div[data-testid="stVerticalBlock"] {
+                gap: 0.45rem !important;
+            }
+
+            div[data-testid="stHorizontalBlock"] {
+                gap: 0.45rem !important;
+            }
+
+            [data-testid="stVerticalBlockBorderWrapper"],
+            div[data-testid="stPlotlyChart"],
+            div[data-testid="stDataFrame"] {
+                border-radius: 14px !important;
+            }
+
+            div[data-testid="stPlotlyChart"] {
+                padding: 0.45rem 0.5rem !important;
+            }
+
+            .chart-card-header h3 {
+                font-size: clamp(11px, 2.4vw, 14px);
+            }
+
+            .chart-card-header p {
+                font-size: clamp(8px, 1.85vw, 10px);
+                margin-top: 5px;
+            }
+
+            button[data-baseweb="tab"] {
+                padding-left: 10px !important;
+                padding-right: 10px !important;
+                font-size: 12px !important;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .block-container {
+                padding-left: 0.55rem !important;
+                padding-right: 0.55rem !important;
+            }
+
+            .main-title {
+                font-size: clamp(1.45rem, 8.5vw, 2rem);
+            }
+
+            .forecast-context {
+                font-size: clamp(8.2px, 2.8vw, 10px);
+            }
+
+            div[data-testid="stPlotlyChart"] {
+                padding: 0.35rem 0.35rem !important;
+            }
+
+            button[data-baseweb="tab"] {
+                padding-left: 8px !important;
+                padding-right: 8px !important;
+                font-size: 11px !important;
+            }
         }
     </style>
     """,
@@ -183,6 +344,46 @@ css_path = Path("styles/main.css")
 if css_path.exists():
     with open(css_path, encoding="utf-8") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+# =========================
+# Refuerzo de estilo de esta vista
+# =========================
+st.markdown(
+    """
+    <style>
+        [data-testid="stVerticalBlockBorderWrapper"],
+        div[data-testid="stPlotlyChart"],
+        div[data-testid="stDataFrame"] {
+            border: 1.7px solid rgba(100, 116, 139, 0.52) !important;
+            border-radius: clamp(18px, 1.55vw, 24px) !important;
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.035) !important;
+            overflow: hidden !important;
+        }
+
+        div[data-testid="stMetric"] {
+            border: 1.4px solid rgba(100, 116, 139, 0.38) !important;
+            border-radius: clamp(14px, 1.2vw, 18px) !important;
+        }
+
+        div[data-testid="stPlotlyChart"]:hover,
+        div[data-testid="stDataFrame"]:hover,
+        [data-testid="stVerticalBlockBorderWrapper"]:hover {
+            border-color: rgba(71, 85, 105, 0.62) !important;
+        }
+
+        @media (max-width: 820px) {
+            [data-testid="stVerticalBlockBorderWrapper"],
+            div[data-testid="stPlotlyChart"],
+            div[data-testid="stDataFrame"] {
+                border-radius: 14px !important;
+            }
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 
 # =========================
 # Tarjeta compacta superior
@@ -201,24 +402,48 @@ def metric_card(title, value, description, badge, icon, accent, progress):
 
     return f"""
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <style>
-    body {{
+    html, body {{
+        width: 100%;
+        height: 100%;
         margin: 0;
+        padding: 0;
         background: transparent;
-        font-family: Inter, system-ui, sans-serif;
+        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        overflow: hidden;
+    }}
+
+    * {{
+        box-sizing: border-box;
+    }}
+
+    :root {{
+        --rd-card-bg: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        --rd-card-border: 1.7px solid rgba(100, 116, 139, 0.52);
+        --rd-card-border-hover: rgba(71, 85, 105, 0.62);
+        --rd-card-radius: clamp(18px, 1.55vw, 24px);
+        --rd-inner-border: 1.4px solid rgba(100, 116, 139, 0.38);
+        --rd-card-shadow: 0 8px 24px rgba(15, 23, 42, 0.035);
     }}
 
     .metric-card {{
         position: relative;
         overflow: hidden;
-        height: 155px;
-        box-sizing: border-box;
-        border-radius: 24px;
-        padding: 26px 20px 18px 20px;
-        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        border: 1px solid rgba(148, 163, 184, 0.28);
+        height: 100%;
+        min-height: 128px;
+        width: 100%;
+        border-radius: var(--rd-card-radius);
+        padding: clamp(15px, 1.05vw, 19px) clamp(17px, 1.25vw, 23px) clamp(13px, 0.95vw, 17px);
+        background: var(--rd-card-bg);
+        border: var(--rd-card-border);
+        box-shadow: var(--rd-card-shadow);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }}
 
     .metric-card::before {{
@@ -227,15 +452,20 @@ def metric_card(title, value, description, badge, icon, accent, progress):
         top: 0;
         left: 0;
         width: 100%;
-        height: 7px;
+        height: clamp(5px, 0.45vw, 7px);
         background: var(--accent-color);
+    }}
+
+    .metric-card:hover {{
+        border-color: var(--rd-card-border-hover);
     }}
 
     .metric-title {{
         color: #0f172a;
-        font-size: 15px;
-        font-weight: 900;
-        margin: 0 0 14px 0;
+        font-size: clamp(16px, 1.18vw, 20px);
+        font-weight: 950;
+        margin: 0 0 clamp(5px, 0.55vw, 8px) 0;
+        line-height: 1.1;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -243,10 +473,11 @@ def metric_card(title, value, description, badge, icon, accent, progress):
 
     .metric-value {{
         color: #0f172a;
-        font-size: clamp(20px, 2.1vw, 28px);
+        font-size: clamp(34px, 2.65vw, 46px);
         font-weight: 950;
-        line-height: 1.05;
-        margin: 0 0 8px 0;
+        line-height: 1;
+        letter-spacing: clamp(-1px, -0.08vw, -0.6px);
+        margin: 0 0 clamp(5px, 0.45vw, 8px) 0;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -254,9 +485,9 @@ def metric_card(title, value, description, badge, icon, accent, progress):
 
     .metric-description {{
         color: #64748b;
-        font-size: 13px;
-        font-weight: 700;
-        line-height: 1.3;
+        font-size: clamp(13px, 0.95vw, 16px);
+        font-weight: 750;
+        line-height: 1.24;
         margin: 0;
         display: -webkit-box;
         -webkit-line-clamp: 2;
@@ -267,24 +498,27 @@ def metric_card(title, value, description, badge, icon, accent, progress):
     .metric-footer {{
         display: flex;
         align-items: center;
-        gap: 8px;
-        margin-top: 10px;
+        gap: clamp(7px, 0.65vw, 9px);
+        margin-top: clamp(7px, 0.6vw, 10px);
+        min-width: 0;
     }}
 
     .metric-badge {{
         color: #334155;
-        background: rgba(15, 23, 42, 0.06);
-        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: rgba(255, 255, 255, 0.9);
+        border: var(--rd-inner-border);
         border-radius: 999px;
-        padding: 4px 9px;
-        font-size: 10px;
-        font-weight: 850;
+        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.035);
+        padding: clamp(3px, 0.35vw, 5px) clamp(7px, 0.7vw, 10px);
+        font-size: clamp(10.5px, 0.78vw, 13px);
+        font-weight: 950;
         white-space: nowrap;
     }}
 
     .metric-track {{
         flex: 1;
-        height: 6px;
+        min-width: 38px;
+        height: clamp(6px, 0.48vw, 8px);
         border-radius: 999px;
         background: #e5e7eb;
         overflow: hidden;
@@ -295,6 +529,83 @@ def metric_card(title, value, description, badge, icon, accent, progress):
         height: 100%;
         border-radius: 999px;
         background: var(--accent-color);
+    }}
+
+    @media (max-width: 820px) {{
+        html, body {{
+            overflow: visible;
+        }}
+
+        .metric-card {{
+            min-height: 122px;
+            height: 100%;
+            border-radius: 14px;
+            padding: 13px 10px 10px;
+        }}
+
+        .metric-card::before {{
+            height: 4px;
+        }}
+
+        .metric-title {{
+            font-size: clamp(11px, 2.2vw, 14px);
+            margin-bottom: 5px;
+        }}
+
+        .metric-value {{
+            font-size: clamp(21px, 4.2vw, 28px);
+            white-space: normal;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }}
+
+        .metric-description {{
+            font-size: clamp(9.5px, 1.85vw, 12px);
+            line-height: 1.18;
+        }}
+
+        .metric-badge {{
+            font-size: clamp(8.5px, 1.6vw, 10.5px);
+            padding: 3px 7px;
+        }}
+    }}
+
+    @media (max-width: 520px) {{
+        .metric-card {{
+            min-height: 112px;
+            height: 100%;
+            padding: 11px 7px 8px;
+            border-radius: 13px;
+        }}
+
+        .metric-title {{
+            font-size: clamp(9px, 2.1vw, 11px);
+            margin-bottom: 4px;
+        }}
+
+        .metric-value {{
+            font-size: clamp(17px, 3.8vw, 22px);
+            margin-bottom: 4px;
+        }}
+
+        .metric-description {{
+            font-size: clamp(8px, 1.75vw, 9.5px);
+        }}
+
+        .metric-footer {{
+            gap: 5px;
+            margin-top: 6px;
+        }}
+
+        .metric-badge {{
+            font-size: clamp(7px, 1.6vw, 8.5px);
+            padding: 2px 5px;
+        }}
+
+        .metric-track {{
+            min-width: 24px;
+        }}
     }}
 </style>
 </head>
@@ -313,7 +624,6 @@ def metric_card(title, value, description, badge, icon, accent, progress):
 </html>
 """
 
-
 dot = lambda color: (
     f'<span style="display:inline-block;width:11px;height:11px;border-radius:50%;'
     f'background:{color};margin-right:5px;vertical-align:middle;"></span>'
@@ -325,30 +635,34 @@ def _mini_kpi(label, value):
 
     return f"""
     <div style="
-        height: 74px;
+        height: clamp(82px, 6.8vw, 94px);
+        min-height: 82px;
         box-sizing: border-box;
-        border-radius: 18px;
-        padding: 12px 14px;
+        border-radius: clamp(14px, 1.2vw, 18px);
+        padding: clamp(9px, 0.88vw, 12px) clamp(12px, 1.05vw, 16px);
         background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        border: 1px solid rgba(148, 163, 184, 0.28);
+        border: 1.7px solid rgba(100, 116, 139, 0.52);
+        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.035);
         display: flex;
         flex-direction: column;
         justify-content: center;
+        overflow: hidden;
     ">
         <p style="
-            margin: 0 0 6px 0;
-            font-size: 10px;
-            font-weight: 850;
+            margin: 0 0 clamp(4px, 0.42vw, 6px) 0;
+            font-size: clamp(10.5px, 0.78vw, 13px);
+            font-weight: 950;
             color: #64748b;
             text-transform: uppercase;
             letter-spacing: .25px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            line-height: 1.1;
         ">{label}</p>
         <p style="
             margin: 0;
-            font-size: 20px;
+            font-size: clamp(19px, 1.78vw, 27px);
             font-weight: 950;
             color: #0f172a;
             letter-spacing: -0.6px;
@@ -362,50 +676,17 @@ def _mini_kpi(label, value):
 
 
 def section_title(label, subtitle="", popover_title="Ver", popover_body=""):
-    st.markdown(
-        """
-        <style>
-        div[data-testid="stPopover"] button {
-            min-width: 105px !important;
-            height: 38px !important;
-            white-space: nowrap !important;
-            border-radius: 999px !important;
-            font-weight: 700 !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            padding: 0 16px !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+    label = escape(str(label))
+    subtitle = escape(str(subtitle))
 
     col_t, col_p = st.columns([6.5, 1.7])
 
     with col_t:
         st.markdown(
             f"""
-            <div class="chart-card-header" style="padding:0;margin-bottom:8px;">
-                <h3 style="
-                    color:#0f172a;
-                    font-size:20px;
-                    font-weight:900;
-                    margin:0;
-                    letter-spacing:-0.4px;
-                    line-height:1.15;
-                ">
-                    {label}
-                </h3>
-                <p style="
-                    color:#64748b;
-                    font-size:13px;
-                    font-weight:700;
-                    margin:8px 0 0 0;
-                    line-height:1.25;
-                ">
-                    {subtitle}
-                </p>
+            <div class="chart-card-header">
+                <h3>{label}</h3>
+                <p>{subtitle}</p>
             </div>
             """,
             unsafe_allow_html=True,
@@ -414,12 +695,14 @@ def section_title(label, subtitle="", popover_title="Ver", popover_body=""):
     with col_p:
         if popover_body:
             st.markdown(
-                "<div style='height:4px;'></div>",
+                "<div style='height:clamp(2px,0.35vw,4px);'></div>",
                 unsafe_allow_html=True
             )
 
             with st.popover(popover_title if popover_title else "Ver", use_container_width=True):
                 st.markdown(popover_body)
+
+    st.markdown("<div class='section-title-spacer'></div>", unsafe_allow_html=True)
 
 # COLORES Y UMBRALES
 def period_thresholds(h):
@@ -647,7 +930,7 @@ with tab_resumen:
             f"Histórico: {kpi_hist_units:,.0f} uds · Total: {sign_t}{kpi_growth_total:.1f}% · Ponderado: {sign_wp}{kpi_growth_ponderado:.1f}%",
             t1_badge, "→", t1_accent,
             min(abs(kpi_growth_total/ref25*100) if ref25>0 else 70, 100),
-        ), height=160, scrolling=False)
+        ), height=148, scrolling=False)
 
     with c2:
         components.html(metric_card(
@@ -655,7 +938,7 @@ with tab_resumen:
             f"+{best_pct:.1f}% según Prophet · {annualize(best_pct,horizon):+.1f}% anualizado",
             best_badge, "+", best_accent,
             min(abs(best_pct/ref25*100) if ref25>0 else 0, 100),
-        ), height=160, scrolling=False)
+        ), height=148, scrolling=False)
 
     with c3:
         sign3 = "+" if worst_pct >= 0 else ""
@@ -664,7 +947,7 @@ with tab_resumen:
             f"{sign3}{worst_pct:.1f}% según Prophet · {annualize(worst_pct,horizon):+.1f}% anualizado",
             worst_badge, "!", worst_accent,
             min(abs(worst_pct/ref25*100) if ref25>0 else 0, 100),
-        ), height=160, scrolling=False)
+        ), height=148, scrolling=False)
 
     st.divider()
 
@@ -727,21 +1010,23 @@ with tab_resumen:
         padding = (x_max - x_min) * 0.18 if x_max != x_min else 1
 
         fig_bar.update_layout(
-            height=300,
+            height=340,
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
-            margin=dict(l=10, r=120, t=70, b=30),
-            yaxis=dict(autorange="reversed", tickfont=dict(size=12), automargin=True),
+            font=dict(color="#0f172a", family="Inter, system-ui, sans-serif", size=12),
+            margin=dict(l=18, r=122, t=64, b=64),
+            yaxis=dict(autorange="reversed", tickfont=dict(size=13), automargin=True),
             xaxis=dict(
-                title=f"Crecimiento Prophet en {horizon} meses (%)",
+                title=dict(text=f"Crecimiento Prophet en {horizon} meses (%)", font=dict(size=14), standoff=14),
                 showgrid=True, gridcolor="rgba(0,0,0,0.18)",
                 zeroline=True, zerolinecolor="rgba(0,0,0,0.35)", zerolinewidth=2,
+                tickfont=dict(size=12),
+                automargin=True,
                 range=[x_min, x_max + padding]
             ),
         )
 
-        st.plotly_chart(fig_bar, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig_bar, use_container_width=True, config={"displayModeBar": False, "responsive": True})
 
     with col_acc:
         section_title("Confiabilidad", subtitle="Walk-forward · histórico")
@@ -773,9 +1058,9 @@ with tab_resumen:
         ))
 
         fig_gauge.update_layout(
-            height=300,
+            height=340,
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=10, r=10, t=10, b=10),
+            margin=dict(l=12, r=12, t=14, b=18),
             font=dict(family="Inter, system-ui, sans-serif", color="#0f172a"),
             annotations=[dict(
                 text=(
@@ -789,7 +1074,7 @@ with tab_resumen:
             )]
         )
 
-        st.plotly_chart(fig_gauge, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig_gauge, use_container_width=True, config={"displayModeBar": False, "responsive": True})
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -880,15 +1165,15 @@ with tab_analisis:
             hovertemplate="<b>%{x|%b %Y}</b><br>%{y:,.0f} uds<extra></extra>",
         ))
         fig_dem.update_layout(
-            height=260, hovermode="x unified",
+            height=270, hovermode="x unified",
             plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
-            margin=dict(l=40, r=20, t=5, b=25),
-            xaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.18)", tickfont=dict(size=9)),
-            yaxis=dict(title="uds", showgrid=True, gridcolor="rgba(0,0,0,0.18)", tickfont=dict(size=9)),
-            legend=dict(orientation="h", y=1.15, x=0, font=dict(size=9)),
+            font=dict(color="#0f172a", family="Inter, system-ui, sans-serif", size=13),
+            margin=dict(l=52, r=24, t=8, b=50),
+            xaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.18)", tickfont=dict(size=12), automargin=True),
+            yaxis=dict(title=dict(text="uds", font=dict(size=14), standoff=10), showgrid=True, gridcolor="rgba(0,0,0,0.18)", tickfont=dict(size=12), automargin=True),
+            legend=dict(orientation="h", y=1.13, x=0, font=dict(size=12)),
         )
-        st.plotly_chart(fig_dem, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig_dem, use_container_width=True, config={"displayModeBar": False, "responsive": True})
     else:
         st.info("Sin datos suficientes (mínimo 6 meses).")
 
@@ -943,14 +1228,14 @@ with tab_analisis:
             hovertemplate="<b>%{x}</b><br>%{y:,.0f} uds<extra></extra>",
         ))
         fig_seas.update_layout(
-            height=250, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
-            margin=dict(l=10, r=20, t=5, b=25),
-            xaxis=dict(showgrid=False, tickfont=dict(size=9)),
+            height=245, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="#0f172a", family="Inter, system-ui, sans-serif", size=13),
+            margin=dict(l=46, r=22, t=8, b=46),
+            xaxis=dict(showgrid=False, tickfont=dict(size=12), automargin=True),
             yaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.18)",
-                       tickfont=dict(size=9), tickformat=",.0f"),
+                       tickfont=dict(size=12), tickformat=",.0f", automargin=True),
         )
-        st.plotly_chart(fig_seas, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig_seas, use_container_width=True, config={"displayModeBar": False, "responsive": True})
 
     with col_reg:
         section_title(
@@ -975,16 +1260,16 @@ with tab_analisis:
             hovertemplate="<b>%{y}</b><br>6m: %{x:,.0f} uds<extra></extra>",
         ))
         fig_comp.update_layout(
-            barmode="group", height=250,
+            barmode="group", height=245,
             plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
-            margin=dict(l=10, r=10, t=5, b=25),
-            legend=dict(orientation="h", y=1.15, x=0, font=dict(size=9)),
-            yaxis=dict(tickfont=dict(size=9)),
+            font=dict(color="#0f172a", family="Inter, system-ui, sans-serif", size=13),
+            margin=dict(l=78, r=18, t=8, b=46),
+            legend=dict(orientation="h", y=1.14, x=0, font=dict(size=12)),
+            yaxis=dict(tickfont=dict(size=12), automargin=True),
             xaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.18)",
-                       tickfont=dict(size=9), tickformat=",.0f"),
+                       tickfont=dict(size=12), tickformat=",.0f", automargin=True),
         )
-        st.plotly_chart(fig_comp, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig_comp, use_container_width=True, config={"displayModeBar": False, "responsive": True})
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -1054,7 +1339,7 @@ with tab_redist:
     with km4:
         st.markdown(_mini_kpi("Período", f"{primera_fecha} – {ultima_fecha}"), unsafe_allow_html=True)
 
-    st.markdown("<div style='margin-top:6px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div class='redist-map-spacer'></div>", unsafe_allow_html=True)
 
     if vista_redist == "Mapa":
         frames, slider_steps, init_nodes, init_routes, init_annotation, n_frames = \
@@ -1064,10 +1349,10 @@ with tab_redist:
             data=[init_nodes] + init_routes,
             frames=frames,
             layout=go.Layout(
-                height=520,
+                height=510,
                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
-                margin=dict(l=0, r=0, t=40, b=0),
+                font=dict(color="#0f172a", family="Inter, system-ui, sans-serif", size=12),
+                margin=dict(l=0, r=0, t=36, b=24),
                 geo=GEO_LAYOUT,
                 annotations=[init_annotation],
                 title=dict(
@@ -1077,7 +1362,7 @@ with tab_redist:
                 ),
                 updatemenus=[dict(
                     type="buttons", showactive=False, direction="left",
-                    x=0.5, xanchor="center", y=-0.04, yanchor="top",
+                    x=0.5, xanchor="center", y=-0.035, yanchor="top",
                     bgcolor="#f1f5f9", bordercolor="rgba(148,163,184,.4)",
                     font=dict(color="#0f172a", size=12),
                     pad=dict(r=8, t=8),
@@ -1093,7 +1378,7 @@ with tab_redist:
                 sliders=[dict(
                     active=0,
                     currentvalue=dict(prefix="", visible=True, font=dict(size=11, color="#64748b")),
-                    pad=dict(t=45, b=8, l=20, r=20),
+                    pad=dict(t=44, b=8, l=20, r=20),
                     len=0.92, x=0.04,
                     bgcolor="#f8fafc", bordercolor="rgba(148,163,184,.3)",
                     borderwidth=2, font=dict(color="#334155", size=10),
@@ -1101,7 +1386,7 @@ with tab_redist:
                 )],
             ),
         )
-        st.plotly_chart(fig_map, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig_map, use_container_width=True, config={"displayModeBar": False, "responsive": True})
 
     else:
         base_oleadas = (
@@ -1159,7 +1444,7 @@ with tab_redist:
             .to_dict()
         )
 
-        PANEL_H = 320
+        PANEL_H = 340
         col_tabla, col_chart = st.columns([1, 1], gap="large")
 
         with col_tabla:
@@ -1192,13 +1477,13 @@ with tab_redist:
             fig_prog.update_layout(
                 height=PANEL_H,
                 plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
-                margin=dict(l=10, r=10, t=8, b=60),
-                xaxis=dict(showgrid=False, tickfont=dict(size=8)),
-                yaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.18)", tickfont=dict(size=9)),
+                font=dict(color="#0f172a", family="Inter, system-ui, sans-serif", size=12),
+                margin=dict(l=44, r=16, t=14, b=78),
+                xaxis=dict(showgrid=False, tickfont=dict(size=10), automargin=True),
+                yaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.18)", tickfont=dict(size=11), automargin=True),
                 showlegend=False,
             )
-            st.plotly_chart(fig_prog, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_prog, use_container_width=True, config={"displayModeBar": False, "responsive": True})
 
             emojis = ["🔵","🟢","🟠","🟣","🔴","🟡"]
             caption_parts = [

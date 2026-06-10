@@ -1,18 +1,44 @@
+# pages/4_Pronosticos.py
+# DANUStore — Pronósticos de Demanda
+
+import warnings
+warnings.filterwarnings("ignore")
+
 import streamlit as st
 import streamlit.components.v1 as components
-from html import escape
+
 import pandas as pd
 import numpy as np
-from pathlib import Path
+import plotly.graph_objects as go
 
+from pathlib import Path
+from html import escape
+
+from src.forecast_engine import (
+    load_data,
+    fit_prophet,
+    build_forecast_summary,
+    build_subcat_region_forecast,
+    build_region_forecast,
+)
+from src.redistribucion import (
+    REGION_COORDS,
+    REG_LABEL,
+    GEO_LAYOUT,
+    build_redist_base,
+    build_monthly_forecast,
+    build_wave_plan,
+    build_animation_frames,
+    _make_nodes,
+)
 
 # =========================
-# Configuración
+# Configuración de página
 # =========================
 st.set_page_config(
     layout="wide",
-    page_title="Inventario",
-    page_icon="📦"
+    page_title="Pronósticos — DANUStore",
+    page_icon="🚀"
 )
 
 
@@ -22,6 +48,17 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+        :root {
+            --rd-card-bg: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            --rd-card-border: 1.7px solid rgba(100, 116, 139, 0.52);
+            --rd-card-border-hover: rgba(71, 85, 105, 0.62);
+            --rd-card-radius: clamp(18px, 1.55vw, 24px);
+            --rd-inner-border: 1.4px solid rgba(100, 116, 139, 0.38);
+            --rd-card-shadow: 0 8px 24px rgba(15, 23, 42, 0.035);
+            --rd-inner-shadow: 0 6px 16px rgba(15, 23, 42, 0.035);
+            --rd-gap: clamp(8px, 0.82vw, 12px);
+        }
+
         .block-container {
             padding-top: clamp(1.4rem, 2vh, 2.2rem) !important;
             padding-bottom: clamp(0.8rem, 1.4vh, 1.2rem) !important;
@@ -30,7 +67,7 @@ st.markdown(
             max-width: 100% !important;
         }
 
-        h1, h2, h3 {
+        h1, h2, h3, h4 {
             margin-top: 0 !important;
         }
 
@@ -39,8 +76,18 @@ st.markdown(
             font-size: clamp(2rem, 3.35vw, 3.25rem);
             font-weight: 950;
             letter-spacing: clamp(-1.4px, -0.12vw, -0.7px);
-            margin: 0 0 clamp(1rem, 1.6vw, 1.5rem) 0;
+            margin: 0 0 clamp(0.45rem, 0.8vw, 0.75rem) 0;
             line-height: 1.05;
+        }
+
+        .forecast-context {
+            color: #64748b;
+            font-size: clamp(11px, 0.9vw, 13px);
+            font-weight: 800;
+            margin: 0 0 clamp(0.7rem, 1.1vw, 1rem) 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         div[data-testid="stVerticalBlock"] {
@@ -51,13 +98,138 @@ st.markdown(
             gap: clamp(0.55rem, 0.85vw, 0.8rem) !important;
         }
 
+        div[data-testid="stMarkdownContainer"]:has(.main-title),
+        div[data-testid="stMarkdownContainer"]:has(.forecast-context) {
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+        }
+
+        div[data-testid="stTabs"] {
+            margin-top: 0 !important;
+        }
+
+        button[data-baseweb="tab"] {
+            padding-top: 7px !important;
+            padding-bottom: 7px !important;
+            border-radius: 999px !important;
+            font-weight: 850 !important;
+        }
+
+        button[kind="secondary"] {
+            border-radius: 999px !important;
+            font-weight: 850 !important;
+        }
+
         iframe {
             display: block;
             width: 100% !important;
             max-width: 100% !important;
         }
 
-        @media (max-width: 760px) {
+        .chart-card-header {
+            padding: 0;
+            margin-bottom: clamp(7px, 0.8vw, 12px);
+        }
+
+        .chart-card-header h3 {
+            color: #0f172a;
+            font-size: clamp(14px, 1.15vw, 18px);
+            font-weight: 950;
+            margin: 0;
+            letter-spacing: -0.25px;
+            line-height: 1.15;
+        }
+
+        .chart-card-header p {
+            color: #64748b;
+            font-size: clamp(10px, 0.82vw, 12px);
+            font-weight: 750;
+            margin: clamp(6px, 0.65vw, 9px) 0 0 0;
+            line-height: 1.25;
+        }
+
+        [data-testid="stVerticalBlockBorderWrapper"],
+        div[data-testid="stPlotlyChart"],
+        div[data-testid="stDataFrame"] {
+            border-radius: var(--rd-card-radius) !important;
+            border: var(--rd-card-border) !important;
+            background: var(--rd-card-bg) !important;
+            box-shadow: var(--rd-card-shadow) !important;
+            overflow: hidden !important;
+        }
+
+        [data-testid="stVerticalBlockBorderWrapper"] {
+            padding: clamp(0.5rem, 0.85vw, 0.8rem) !important;
+        }
+
+        div[data-testid="stPlotlyChart"] {
+            padding: clamp(0.45rem, 0.8vw, 0.7rem) clamp(0.55rem, 0.95vw, 0.85rem) !important;
+        }
+
+        div[data-testid="stPlotlyChart"] > div {
+            width: 100% !important;
+        }
+
+        div[data-testid="stMetric"] {
+            border-radius: clamp(14px, 1.2vw, 18px) !important;
+            border: var(--rd-inner-border) !important;
+            background: rgba(255, 255, 255, 0.9) !important;
+            box-shadow: var(--rd-inner-shadow) !important;
+            padding: clamp(0.55rem, 0.8vw, 0.75rem) clamp(0.65rem, 0.95vw, 0.85rem) !important;
+        }
+
+        div[data-testid="stDataFrame"] {
+            background: #ffffff !important;
+        }
+
+        div[data-testid="stPlotlyChart"]:hover,
+        div[data-testid="stDataFrame"]:hover,
+        [data-testid="stVerticalBlockBorderWrapper"]:hover,
+        div[data-testid="stMetric"]:hover {
+            border-color: var(--rd-card-border-hover) !important;
+        }
+
+        [data-testid="stExpander"],
+        [data-testid="stPopover"] {
+            font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        div[data-testid="stPopover"] button {
+            min-width: 105px !important;
+            height: 38px !important;
+            white-space: nowrap !important;
+            border-radius: 999px !important;
+            font-weight: 800 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 0 clamp(12px, 1vw, 16px) !important;
+        }
+
+        div[data-testid="stRadio"] label {
+            font-weight: 800 !important;
+        }
+
+        @media (max-width: 1180px) {
+            .block-container {
+                padding-left: clamp(0.85rem, 1.6vw, 1.2rem) !important;
+                padding-right: clamp(0.85rem, 1.6vw, 1.2rem) !important;
+            }
+
+            .chart-card-header h3 {
+                font-size: clamp(13px, 1.65vw, 17px);
+            }
+
+            .chart-card-header p {
+                font-size: clamp(9.5px, 1.15vw, 12px);
+            }
+
+            div[data-testid="stPlotlyChart"] {
+                padding: 0.55rem 0.65rem !important;
+            }
+        }
+
+        @media (max-width: 820px) {
             .block-container {
                 padding-left: 0.75rem !important;
                 padding-right: 0.75rem !important;
@@ -66,13 +238,80 @@ st.markdown(
 
             .main-title {
                 font-size: clamp(1.7rem, 8vw, 2.35rem);
-                margin-bottom: 0.85rem;
+                margin-bottom: 0.55rem;
+            }
+
+            .forecast-context {
+                font-size: clamp(9.5px, 2.4vw, 12px);
+                white-space: normal;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+            }
+
+            div[data-testid="stVerticalBlock"] {
+                gap: 0.45rem !important;
+            }
+
+            div[data-testid="stHorizontalBlock"] {
+                gap: 0.45rem !important;
+            }
+
+            [data-testid="stVerticalBlockBorderWrapper"],
+            div[data-testid="stPlotlyChart"],
+            div[data-testid="stDataFrame"] {
+                border-radius: 14px !important;
+            }
+
+            div[data-testid="stPlotlyChart"] {
+                padding: 0.45rem 0.5rem !important;
+            }
+
+            .chart-card-header h3 {
+                font-size: clamp(11px, 2.4vw, 14px);
+            }
+
+            .chart-card-header p {
+                font-size: clamp(8px, 1.85vw, 10px);
+                margin-top: 5px;
+            }
+
+            button[data-baseweb="tab"] {
+                padding-left: 10px !important;
+                padding-right: 10px !important;
+                font-size: 12px !important;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .block-container {
+                padding-left: 0.55rem !important;
+                padding-right: 0.55rem !important;
+            }
+
+            .main-title {
+                font-size: clamp(1.45rem, 8.5vw, 2rem);
+            }
+
+            .forecast-context {
+                font-size: clamp(8.2px, 2.8vw, 10px);
+            }
+
+            div[data-testid="stPlotlyChart"] {
+                padding: 0.35rem 0.35rem !important;
+            }
+
+            button[data-baseweb="tab"] {
+                padding-left: 8px !important;
+                padding-right: 8px !important;
+                font-size: 11px !important;
             }
         }
     </style>
     """,
     unsafe_allow_html=True
 )
+
 
 # =========================
 # Cargar CSS personalizado
@@ -83,401 +322,62 @@ if css_path.exists():
     with open(css_path, encoding="utf-8") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-
 # =========================
-# Funciones auxiliares
+# Refuerzo de estilo de esta vista
 # =========================
-def formato_numero(valor):
-    if pd.isna(valor):
-        return "0"
-
-    valor = float(valor)
-
-    if abs(valor) >= 1_000_000:
-        return f"{valor / 1_000_000:.1f}M"
-
-    if abs(valor) >= 1_000:
-        return f"{valor / 1_000:.1f}K"
-
-    return f"{valor:,.0f}"
-
-
-def formato_pesos(valor):
-    if pd.isna(valor):
-        return "$0"
-
-    valor = float(valor)
-
-    if abs(valor) >= 1_000_000:
-        return f"${valor / 1_000_000:.1f}M"
-
-    if abs(valor) >= 1_000:
-        return f"${valor / 1_000:.1f}K"
-
-    return f"${valor:,.0f}"
-
-
-def safe_div(a, b):
-    return a / b if b not in [0, None] and not pd.isna(b) else 0
-
-
-# =========================
-# Cargar datos
-# =========================
-@st.cache_data
-def cargar_datos():
-    ruta = Path("data/df_Maestra.csv")
-    df = pd.read_csv(ruta)
-
-    df.columns = df.columns.str.strip()
-    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-
-    columnas_numericas = [
-        "Units_sold",
-        "Stock",
-        "Units_expected",
-        "Sales_amount",
-        "Sell_through_pct",
-        "Days_inventory",
-        "Stock_turnover"
-    ]
-
-    for col in columnas_numericas:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-
-    return df
-
-
-df_maestra = cargar_datos()
-
-
-# =========================
-# Sidebar - Filtros
-# =========================
-with st.sidebar:
-    st.markdown(
-        """
-        <div class="sidebar-header">
-            <div class="sidebar-icon">🚀</div>
-            <div>
-                <p class="sidebar-title">RocketData</p>
-                <p class="sidebar-subtitle">Inventory Dashboard</p>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.page_link("Inicio.py", label="Inicio")
-    st.page_link("pages/1_Inventario.py", label="Inventario")
-    st.page_link("pages/2_Ventas.py", label="Ventas")
-    st.page_link("pages/3_Alertas.py", label="Alertas")
-    st.page_link("pages/4_Pronosticos.py", label="Pronósticos")
-
-    st.divider()
-
-    st.markdown("### Filtros")
-
-    fecha_min = df_maestra["Date"].min().date()
-    fecha_max = df_maestra["Date"].max().date()
-
-    rango_fechas = st.date_input(
-        "Rango de fechas",
-        value=(fecha_min, fecha_max),
-        min_value=fecha_min,
-        max_value=fecha_max
-    )
-
-    regiones = sorted(df_maestra["Region"].dropna().unique().tolist())
-    region = st.selectbox(
-        "Región",
-        ["Todas"] + regiones
-    )
-
-    categorias = sorted(df_maestra["Category"].dropna().unique().tolist())
-    categoria = st.selectbox(
-        "Categoría",
-        ["Todas"] + categorias
-    )
-
-    # =========================
-    # Subcategoría dependiente de filtros previos
-    # =========================
-    df_subcategorias = df_maestra.copy()
-
-    if isinstance(rango_fechas, tuple) and len(rango_fechas) == 2:
-        fecha_inicio, fecha_fin = rango_fechas
-
-        df_subcategorias = df_subcategorias[
-            (df_subcategorias["Date"].dt.date >= fecha_inicio) &
-            (df_subcategorias["Date"].dt.date <= fecha_fin)
-        ]
-
-    if region != "Todas":
-        df_subcategorias = df_subcategorias[
-            df_subcategorias["Region"] == region
-        ]
-
-    if categoria != "Todas":
-        df_subcategorias = df_subcategorias[
-            df_subcategorias["Category"] == categoria
-        ]
-
-    subcategorias = sorted(
-        df_subcategorias["Subcategory"]
-        .dropna()
-        .unique()
-        .tolist()
-    )
-
-    subcategoria = st.selectbox(
-        "Subcategoría",
-        ["Todas"] + subcategorias
-    )
-
-    if "Priority_action" in df_maestra.columns:
-        acciones = sorted(df_maestra["Priority_action"].dropna().unique().tolist())
-        acciones_seleccionadas = st.multiselect(
-            "Acción prioritaria",
-            acciones,
-            default=acciones
-        )
-    else:
-        acciones_seleccionadas = []
-
-
-# =========================
-# Aplicar filtros
-# =========================
-df = df_maestra.copy()
-
-if isinstance(rango_fechas, tuple) and len(rango_fechas) == 2:
-    fecha_inicio, fecha_fin = rango_fechas
-
-    df = df[
-        (df["Date"].dt.date >= fecha_inicio) &
-        (df["Date"].dt.date <= fecha_fin)
-    ]
-
-if region != "Todas":
-    df = df[df["Region"] == region]
-
-if categoria != "Todas":
-    df = df[df["Category"] == categoria]
-
-if subcategoria != "Todas":
-    df = df[df["Subcategory"] == subcategoria]
-
-if acciones_seleccionadas and "Priority_action" in df.columns:
-    df = df[df["Priority_action"].isin(acciones_seleccionadas)]
-
-
-# =========================
-# Cálculos de inventario
-# =========================
-# Sobrestock real: inventario disponible menos unidades vendidas.
-# Si quieres mantener tu métrica anterior, cambia Units_sold por Units_expected.
-df["Exceso_stock"] = (df["Stock"] - df["Units_sold"]).clip(lower=0)
-
-# Precio unitario estimado
-df["Precio_unitario"] = np.where(
-    df["Units_sold"] > 0,
-    df["Sales_amount"] / df["Units_sold"],
-    np.nan
-)
-
-precio_global = df["Precio_unitario"].replace([np.inf, -np.inf], np.nan).median()
-
-if "Subcategory" in df.columns:
-    df["Precio_unitario"] = df["Precio_unitario"].fillna(
-        df.groupby("Subcategory")["Precio_unitario"].transform("median")
-    )
-
-if "Category" in df.columns:
-    df["Precio_unitario"] = df["Precio_unitario"].fillna(
-        df.groupby("Category")["Precio_unitario"].transform("median")
-    )
-
-df["Precio_unitario"] = df["Precio_unitario"].fillna(precio_global).fillna(0)
-
-df["Valor_inmovilizado"] = df["Exceso_stock"] * df["Precio_unitario"]
-
-# =========================
-# Identificador de producto
-# =========================
-if "Product_name" in df.columns:
-    col_producto = "Product_name"
-elif "Product_Name" in df.columns:
-    col_producto = "Product_Name"
-else:
-    col_producto = "Product_id"
-
-if "Product_id" in df.columns and col_producto != "Product_id":
-    df["Producto_label"] = (
-        df[col_producto].astype(str).str.strip()
-        + " · ID "
-        + df["Product_id"].astype(str)
-    )
-else:
-    df["Producto_label"] = df[col_producto].astype(str)
-
-df_ultimo = (
-    df.sort_values("Date")
-    .groupby("Producto_label", as_index=False)
-    .last()[["Producto_label", "Exceso_stock", "Precio_unitario"]]
-)
-df_ultimo["valor_inmovilizado_actual"] = df_ultimo["Exceso_stock"] * df_ultimo["Precio_unitario"]
-
-# =========================
-# Resumen por producto
-# =========================
-producto_resumen = (
-    df
-    .groupby("Producto_label", as_index=False)
-    .agg(
-        unidades_vendidas=("Units_sold", "sum"),
-        stock_total=("Stock", "sum"),
-        stock_promedio=("Stock", "mean"),
-        exceso_stock=("Exceso_stock", "sum"),
-        ventas_monto=("Sales_amount", "sum")
-    )
-)
-
-producto_resumen = producto_resumen.merge(
-    df_ultimo[["Producto_label", "valor_inmovilizado_actual"]].rename(
-        columns={"valor_inmovilizado_actual": "valor_inmovilizado"}
-    ),
-    on="Producto_label",
-    how="left"
-)
-producto_resumen["valor_inmovilizado"] = producto_resumen["valor_inmovilizado"].fillna(0)
-
-producto_resumen["sell_through_estimado"] = producto_resumen.apply(
-    lambda row: safe_div(
-        row["unidades_vendidas"],
-        row["unidades_vendidas"] + row["stock_promedio"]
-    ) * 100,
-    axis=1
-)
-
-producto_resumen = producto_resumen.sort_values(
-    "exceso_stock",
-    ascending=False
-)
-
-total_productos = producto_resumen["Producto_label"].nunique()
-total_exceso = producto_resumen["exceso_stock"].sum()
-total_valor_inmovilizado = producto_resumen["valor_inmovilizado"].sum()
-
-top5_productos = producto_resumen.head(5).copy()
-
-exceso_top5 = top5_productos["exceso_stock"].sum()
-participacion_top5 = safe_div(exceso_top5, total_exceso) * 100
-
-# Stock muerto: productos con stock, pero cero ventas en el periodo
-stock_muerto_df = producto_resumen[
-    (producto_resumen["unidades_vendidas"] <= 0) &
-    (producto_resumen["stock_total"] > 0)
-].copy()
-
-# Movimiento mínimo: vendieron algo, pero sell-through entre 1% y 5%
-mov_minimo_df = producto_resumen[
-    (producto_resumen["unidades_vendidas"] > 0) &
-    (producto_resumen["sell_through_estimado"] >= 1) &
-    (producto_resumen["sell_through_estimado"] <= 5) &
-    (producto_resumen["stock_total"] > 0)
-].copy()
-
-stock_muerto_count = stock_muerto_df["Producto_label"].nunique()
-mov_minimo_count = mov_minimo_df["Producto_label"].nunique()
-
-valor_stock_muerto = stock_muerto_df["valor_inmovilizado"].sum()
-
-top_stock_muerto = (
-    pd.concat([stock_muerto_df, mov_minimo_df])
-    .drop_duplicates(subset=["Producto_label"])
-    .sort_values("valor_inmovilizado", ascending=False)
-    .head(4)
-)
-
-
-# =========================
-# HTML Top 5 productos
-# =========================
-max_exceso = top5_productos["exceso_stock"].max() if not top5_productos.empty else 1
-
-top5_html = ""
-
-for _, row in top5_productos.iterrows():
-    nombre = escape(str(row["Producto_label"]))
-    exceso = row["exceso_stock"]
-    valor = row["valor_inmovilizado"]
-    porcentaje_barra = safe_div(exceso, max_exceso) * 100
-    porcentaje_total = safe_div(exceso, total_exceso) * 100
-
-    top5_html += f"""
-    <div class="product-row">
-        <div class="product-top">
-            <span class="product-name">{nombre}</span>
-            <span class="product-value">{exceso:,.0f} uds.</span>
-        </div>
-
-        <div class="bar-track">
-            <div class="bar-fill" style="width:{porcentaje_barra:.1f}%;"></div>
-        </div>
-
-        <div class="product-bottom">
-            <span>{porcentaje_total:.1f}% del exceso total</span>
-            <span>{formato_pesos(valor)} inmovilizados</span>
-        </div>
-    </div>
+st.markdown(
     """
+    <style>
+        [data-testid="stVerticalBlockBorderWrapper"],
+        div[data-testid="stPlotlyChart"],
+        div[data-testid="stDataFrame"] {
+            border: 1.7px solid rgba(100, 116, 139, 0.52) !important;
+            border-radius: clamp(18px, 1.55vw, 24px) !important;
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.035) !important;
+            overflow: hidden !important;
+        }
 
+        div[data-testid="stMetric"] {
+            border: 1.4px solid rgba(100, 116, 139, 0.38) !important;
+            border-radius: clamp(14px, 1.2vw, 18px) !important;
+        }
 
-# =========================
-# HTML Stock muerto
-# =========================
-stock_muerto_html = ""
+        div[data-testid="stPlotlyChart"]:hover,
+        div[data-testid="stDataFrame"]:hover,
+        [data-testid="stVerticalBlockBorderWrapper"]:hover {
+            border-color: rgba(71, 85, 105, 0.62) !important;
+        }
 
-if top_stock_muerto.empty:
-    stock_muerto_html = """
-    <div class="empty-state">
-        No se detectaron productos con stock muerto o movimiento mínimo.
-    </div>
-    """
-else:
-    for _, row in top_stock_muerto.iterrows():
-        nombre = escape(str(row["Producto_label"]))
-        unidades = row["unidades_vendidas"]
-        stock = row["stock_total"]
-        valor = row["valor_inmovilizado"]
-
-        etiqueta = "Sin ventas" if unidades <= 0 else "Movimiento mínimo"
-
-        stock_muerto_html += f"""
-        <div class="dead-row">
-            <div>
-                <p class="dead-name">{nombre}</p>
-                <p class="dead-meta">{etiqueta} · Stock acumulado: {stock:,.0f}</p>
-            </div>
-            <div class="dead-value">{formato_pesos(valor)}</div>
-        </div>
-        """
-
-
-producto_mayor_problema = (
-    escape(str(top5_productos.iloc[0]["Producto_label"]))
-    if not top5_productos.empty
-    else "Sin producto"
+        @media (max-width: 820px) {
+            [data-testid="stVerticalBlockBorderWrapper"],
+            div[data-testid="stPlotlyChart"],
+            div[data-testid="stDataFrame"] {
+                border-radius: 14px !important;
+            }
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
 )
 
-valor_top5 = top5_productos["valor_inmovilizado"].sum()
 
 # =========================
-# Vista HTML completa responsiva
+# Tarjeta compacta superior
 # =========================
-dashboard_html = f"""
+def metric_card(title, value, description, badge, icon, accent, progress):
+    title = escape(str(title))
+    value = escape(str(value))
+    description = escape(str(description))
+    badge = escape(str(badge))
+    icon = escape(str(icon))
+
+    try:
+        progress = max(0, min(float(progress), 100))
+    except Exception:
+        progress = 0
+
+    return f"""
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -501,792 +401,1065 @@ dashboard_html = f"""
         --rd-card-bg: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
         --rd-card-border: 1.7px solid rgba(100, 116, 139, 0.52);
         --rd-card-border-hover: rgba(71, 85, 105, 0.62);
-  
         --rd-card-radius: clamp(18px, 1.55vw, 24px);
         --rd-inner-border: 1.4px solid rgba(100, 116, 139, 0.38);
-        --rd-inner-shadow: 0 6px 16px rgba(15, 23, 42, 0.035);
+        --rd-card-shadow: 0 8px 24px rgba(15, 23, 42, 0.035);
     }}
 
-    .dashboard-shell {{
-        width: 100%;
-        max-width: 1500px;
-        margin: 0 auto;
-    }}
-
-    .view {{
-        width: 100%;
-        height: clamp(640px, 53vw, 760px);
-        min-height: 640px;
-        overflow: hidden;
-        display: grid;
-        grid-template-rows: minmax(112px, 0.95fr) minmax(0, 2.72fr) minmax(112px, 0.95fr);
-        gap: clamp(8px, 0.82vw, 12px);
-    }}
-
-    .kpi-grid {{
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: clamp(8px, 0.82vw, 12px);
-        min-height: 0;
-        height: 100%;
-        margin: 0;
-    }}
-
-    .kpi-card {{
+    .metric-card {{
         position: relative;
+        overflow: hidden;
+        height: clamp(142px, 10.8vw, 162px);
+        min-height: 142px;
+        width: 100%;
+        border-radius: var(--rd-card-radius);
+        padding: clamp(16px, 1.35vw, 24px) clamp(14px, 1.45vw, 22px) clamp(12px, 1.05vw, 18px);
         background: var(--rd-card-bg);
         border: var(--rd-card-border);
-        border-radius: var(--rd-card-radius);
-        padding: clamp(14px, 1.35vw, 22px) clamp(14px, 1.45vw, 22px) clamp(12px, 1.05vw, 18px);
-        height: 100%;
-        min-height: 0;
         box-shadow: var(--rd-card-shadow);
-        overflow: hidden;
         display: flex;
         flex-direction: column;
         justify-content: center;
     }}
 
-    .kpi-card::before {{
+    .metric-card::before {{
         content: "";
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
         height: clamp(5px, 0.45vw, 7px);
-        background: #2563eb;
+        background: var(--accent-color);
     }}
 
-    .kpi-grid .kpi-card:nth-child(1)::before {{ background: #7c3aed; }}
-    .kpi-grid .kpi-card:nth-child(2)::before {{ background: #dc2626; }}
-    .kpi-grid .kpi-card:nth-child(3)::before {{ background: #f59e0b; }}
-    .kpi-grid .kpi-card:nth-child(4)::before {{ background: #2563eb; }}
-
-    .kpi-top {{
-        display: block;
-        margin-bottom: clamp(5px, 0.65vw, 9px);
-    }}
-
-    .kpi-label {{
-        color: #0f172a;
-        font-size: clamp(12px, 1.02vw, 15px);
-        font-weight: 950;
-        margin: 0;
-        line-height: 1.1;
-    }}
-
-    .kpi-icon {{
-        display: none;
-    }}
-
-    .kpi-value {{
-        color: #0f172a;
-        font-size: clamp(27px, 2.55vw, 40px);
-        font-weight: 950;
-        line-height: 1;
-        letter-spacing: clamp(-1.35px, -0.08vw, -0.8px);
-        margin: 0 0 clamp(6px, 0.55vw, 9px) 0;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }}
-
-    .kpi-desc {{
-        color: #64748b;
-        font-size: clamp(10px, 0.86vw, 12.5px);
-        font-weight: 750;
-        margin: 0;
-        line-height: 1.24;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }}
-
-    .main-grid {{
-        display: grid;
-        grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.95fr);
-        gap: clamp(8px, 0.82vw, 12px);
-        min-height: 0;
-        height: 100%;
-        margin: 0;
-    }}
-
-    .panel {{
-        background: var(--rd-card-bg);
-        border: var(--rd-card-border);
-        border-radius: var(--rd-card-radius);
-        padding: clamp(13px, 1.18vw, 18px) clamp(16px, 1.45vw, 22px);
-        height: 100%;
-        min-height: 0;
-        box-shadow: var(--rd-card-shadow);
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-    }}
-
-    .products-panel {{
-        min-width: 0;
-    }}
-
-    .panel-title {{
-        color: #0f172a;
-        font-size: clamp(14px, 1.15vw, 17px);
-        font-weight: 950;
-        margin: 0 0 clamp(8px, 0.8vw, 12px) 0;
-        letter-spacing: -0.25px;
-        line-height: 1.15;
-    }}
-
-    .panel-subtitle {{
-        color: #64748b;
-        font-size: clamp(10px, 0.82vw, 12px);
-        font-weight: 750;
-        margin: calc(clamp(6px, 0.65vw, 10px) * -1) 0 clamp(8px, 0.78vw, 12px) 0;
-        line-height: 1.25;
-    }}
-
-    .product-list {{
-        flex: 1;
-        min-height: 0;
-        display: grid;
-        grid-template-rows: repeat(5, minmax(0, 1fr));
-        gap: clamp(7px, 0.95vw, 15px);
-    }}
-
-    .product-row {{
-        margin: 0;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-    }}
-
-    .product-top {{
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: clamp(8px, 0.8vw, 12px);
-        margin-bottom: clamp(3px, 0.35vw, 5px);
-    }}
-
-    .product-name {{
-        color: #111827;
-        font-size: clamp(12px, 0.98vw, 15px);
-        font-weight: 900;
-        max-width: 76%;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }}
-
-    .product-value {{
-        color: #dc2626;
-        font-size: clamp(12px, 0.98vw, 15px);
-        font-weight: 950;
-        white-space: nowrap;
-    }}
-
-    .bar-track {{
-        width: 100%;
-        height: clamp(6px, 0.58vw, 10px);
-        background: #fee2e2;
-        border-radius: 999px;
-        overflow: hidden;
-    }}
-
-    .bar-fill {{
-        height: 100%;
-        border-radius: 999px;
-        background: #dc2626;
-    }}
-
-    .product-bottom {{
-        display: flex;
-        justify-content: space-between;
-        gap: clamp(8px, 0.8vw, 12px);
-        color: #94a3b8;
-        font-size: clamp(10px, 0.78vw, 12px);
-        font-weight: 800;
-        margin-top: clamp(3px, 0.35vw, 5px);
-        line-height: 1.15;
-    }}
-
-    .product-bottom span {{
-        min-width: 0;
-    }}
-
-    .product-bottom span:last-child {{
-        text-align: right;
-        white-space: nowrap;
-    }}
-
-    .dead-summary {{
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: clamp(8px, 0.75vw, 10px);
-        margin-bottom: clamp(8px, 0.78vw, 12px);
-    }}
-
-    .dead-list {{
-        flex: 1;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-    }}
-
-    .dead-mini {{
-        background: rgba(255, 255, 255, 0.9);
-        border: var(--rd-inner-border);
-        border-radius: clamp(14px, 1.2vw, 18px);
-        box-shadow: var(--rd-inner-shadow);
-        padding: clamp(9px, 0.88vw, 12px) clamp(12px, 1.05vw, 16px);
-        overflow: hidden;
-    }}
-
-    .dead-mini-label {{
-        color: #64748b;
-        font-size: clamp(8.5px, 0.68vw, 10px);
-        font-weight: 950;
-        text-transform: uppercase;
-        margin: 0 0 clamp(4px, 0.42vw, 6px) 0;
-        line-height: 1.1;
-    }}
-
-    .dead-mini-value {{
-        color: #0f172a;
-        font-size: clamp(19px, 1.68vw, 24px);
-        font-weight: 950;
-        margin: 0;
-        line-height: 1;
-    }}
-
-    .dead-row {{
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: clamp(8px, 0.75vw, 12px);
-        align-items: center;
-        padding: clamp(5px, 0.58vw, 8px) 0;
-        border-bottom: 1px solid rgba(148, 163, 184, 0.18);
-    }}
-
-    .dead-name {{
-        color: #111827;
-        font-size: clamp(10px, 0.82vw, 12px);
-        font-weight: 900;
-        margin: 0;
-        max-width: 100%;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }}
-
-    .dead-meta {{
-        color: #64748b;
-        font-size: clamp(9px, 0.7vw, 10px);
-        font-weight: 750;
-        margin: 3px 0 0 0;
-        line-height: 1.2;
-    }}
-
-    .dead-value {{
-        color: #dc2626;
-        font-size: clamp(10px, 0.82vw, 12px);
-        font-weight: 950;
-        white-space: nowrap;
-    }}
-
-    .empty-state {{
-        color: #64748b;
-        font-size: clamp(12px, 0.98vw, 15px);
-        font-weight: 750;
-        background: rgba(241, 245, 249, 0.92);
-        border-radius: clamp(14px, 1.25vw, 18px);
-        padding: clamp(14px, 1.3vw, 18px);
-        flex: 1;
-        min-height: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-    }}
-
-    .insight-grid {{
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: clamp(8px, 0.82vw, 12px);
-        min-height: 0;
-        height: 100%;
-        margin: 0;
-    }}
-
-    .insight {{
-        background: var(--rd-card-bg);
-        border: var(--rd-card-border);
-        border-radius: var(--rd-card-radius);
-        padding: clamp(13px, 1.18vw, 18px) clamp(16px, 1.45vw, 22px);
-        height: 100%;
-        min-height: 0;
-        box-shadow: var(--rd-card-shadow);
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-    }}
-
-    .insight-label {{
-        color: #64748b;
-        font-size: clamp(20px, 0.72vw, 24px);
-        font-weight: 950;
-        text-transform: uppercase;
-        margin: 0 0 clamp(6px, 0.5vw, 8px) 0;
-        line-height: 1.1;
-    }}
-
-    .insight-title {{
-        color: #0f172a;
-        font-size: clamp(13px, 1.1vw, 16px);
-        font-weight: 950;
-        margin: 0 0 clamp(5px, 0.42vw, 7px) 0;
-        line-height: 1.15;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }}
-
-    .insight-text {{
-        color: #64748b;
-        font-size: clamp(12px, 0.82vw, 16.5px);
-        font-weight: 750;
-        line-height: 1.3;
-        margin: 0;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }}
-
-    .kpi-card:hover,
-    .panel:hover,
-    .insight:hover {{
+    .metric-card:hover {{
         border-color: var(--rd-card-border-hover);
     }}
 
-    .dead-mini:hover {{
-        border-color: rgba(71, 85, 105, 0.55);
+    .metric-title {{
+        color: #0f172a;
+        font-size: clamp(12px, 1.02vw, 15px);
+        font-weight: 950;
+        margin: 0 0 clamp(8px, 0.85vw, 13px) 0;
+        line-height: 1.1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }}
 
-    @media (max-width: 1180px) {{
+    .metric-value {{
+        color: #0f172a;
+        font-size: clamp(22px, 2.3vw, 31px);
+        font-weight: 950;
+        line-height: 1;
+        letter-spacing: clamp(-1px, -0.08vw, -0.6px);
+        margin: 0 0 clamp(7px, 0.6vw, 10px) 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }}
+
+    .metric-description {{
+        color: #64748b;
+        font-size: clamp(10px, 0.86vw, 12.5px);
+        font-weight: 750;
+        line-height: 1.24;
+        margin: 0;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }}
+
+    .metric-footer {{
+        display: flex;
+        align-items: center;
+        gap: clamp(7px, 0.65vw, 9px);
+        margin-top: clamp(9px, 0.8vw, 12px);
+        min-width: 0;
+    }}
+
+    .metric-badge {{
+        color: #334155;
+        background: rgba(255, 255, 255, 0.9);
+        border: var(--rd-inner-border);
+        border-radius: 999px;
+        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.035);
+        padding: clamp(3px, 0.35vw, 5px) clamp(7px, 0.7vw, 10px);
+        font-size: clamp(8.5px, 0.68vw, 10px);
+        font-weight: 950;
+        white-space: nowrap;
+    }}
+
+    .metric-track {{
+        flex: 1;
+        min-width: 38px;
+        height: clamp(5px, 0.48vw, 7px);
+        border-radius: 999px;
+        background: #e5e7eb;
+        overflow: hidden;
+    }}
+
+    .metric-fill {{
+        width: {progress:.1f}%;
+        height: 100%;
+        border-radius: 999px;
+        background: var(--accent-color);
+    }}
+
+    @media (max-width: 820px) {{
         html, body {{
             overflow: visible;
         }}
 
-        .view {{
-            height: auto;
-            min-height: 0;
-            overflow: visible;
-            grid-template-rows: auto;
-        }}
-
-        .kpi-grid {{
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            height: auto;
-            gap: clamp(6px, 0.75vw, 10px);
-        }}
-
-        .kpi-card {{
-            min-height: clamp(112px, 13vw, 142px);
-            padding: clamp(12px, 1.25vw, 18px) clamp(10px, 1.25vw, 18px);
-        }}
-
-        .kpi-label {{
-            font-size: clamp(10px, 1.35vw, 13px);
-        }}
-
-        .kpi-value {{
-            font-size: clamp(20px, 3vw, 31px);
-        }}
-
-        .kpi-desc {{
-            font-size: clamp(8.5px, 1.15vw, 11px);
-        }}
-
-        .main-grid {{
-            grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.95fr);
-            height: auto;
-            gap: clamp(6px, 0.75vw, 10px);
-        }}
-
-        .panel {{
-            min-height: clamp(330px, 34vw, 380px);
-            padding: clamp(12px, 1.1vw, 17px) clamp(12px, 1.25vw, 20px);
-        }}
-
-        .insight-grid {{
-            height: auto;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-        }}
-
-        .insight {{
+        .metric-card {{
             min-height: 126px;
-        }}
-    }}
-
-    @media (max-width: 820px) {{
-        .kpi-grid {{
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 6px;
-        }}
-
-        .insight-grid {{
-            grid-template-columns: 1fr;
-        }}
-
-        .dead-summary {{
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 6px;
-        }}
-
-        .kpi-card {{
-            min-height: clamp(104px, 24vw, 124px);
-            padding: 11px 7px 9px;
+            height: 126px;
             border-radius: 14px;
+            padding: 13px 10px 10px;
         }}
 
-        .kpi-card::before {{
+        .metric-card::before {{
             height: 4px;
         }}
 
-        .kpi-top {{
-            margin-bottom: 4px;
+        .metric-title {{
+            font-size: clamp(9px, 2.2vw, 11px);
+            margin-bottom: 6px;
         }}
 
-        .kpi-label {{
-            font-size: clamp(7.5px, 2.2vw, 10px);
-            line-height: 1.08;
-        }}
-
-        .kpi-value {{
-            font-size: clamp(13px, 4.4vw, 19px);
-            line-height: 0.98;
-            letter-spacing: -0.5px;
+        .metric-value {{
+            font-size: clamp(16px, 4.2vw, 22px);
             white-space: normal;
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
-            overflow: hidden;
         }}
 
-        .kpi-desc {{
-            font-size: clamp(7px, 1.85vw, 8.6px);
-            line-height: 1.13;
-            -webkit-line-clamp: 2;
+        .metric-description {{
+            font-size: clamp(7.5px, 1.85vw, 9.5px);
+            line-height: 1.16;
         }}
 
-        .main-grid {{
-            grid-template-columns: minmax(0, 1.18fr) minmax(0, 0.92fr);
-            gap: 6px;
-        }}
-
-        .panel {{
-            min-height: clamp(300px, 54vw, 370px);
-            padding: 12px 10px;
-            border-radius: 14px;
-        }}
-
-        .panel-title {{
-            font-size: clamp(10px, 2.05vw, 13px);
-            margin-bottom: 7px;
-        }}
-
-        .panel-subtitle {{
-            font-size: clamp(7.5px, 1.65vw, 9.5px);
-            margin-bottom: 7px;
-        }}
-
-        .product-list {{
-            display: flex;
-            flex-direction: column;
-            gap: clamp(7px, 1.8vw, 12px);
-        }}
-
-        .product-top,
-        .product-bottom {{
-            align-items: flex-start;
-        }}
-
-        .product-bottom {{
-            flex-direction: column;
-            gap: 3px;
-        }}
-
-        .product-bottom span:last-child {{
-            text-align: left;
-        }}
-
-        .product-name {{
-            max-width: 68%;
-        }}
-
-        .empty-state {{
-            min-height: 220px;
-        }}
-
-        .product-name,
-        .product-value {{
-            font-size: clamp(8px, 1.85vw, 11px);
-        }}
-
-        .product-bottom {{
-            font-size: clamp(7px, 1.45vw, 9px);
-        }}
-
-        .dead-mini {{
-            padding: 8px 7px;
-            border-radius: 11px;
-        }}
-
-        .dead-mini-label {{
-            font-size: clamp(6.4px, 1.35vw, 8px);
-        }}
-
-        .dead-mini-value {{
-            font-size: clamp(13px, 2.7vw, 18px);
-        }}
-
-        .empty-state {{
-            min-height: 180px;
-            font-size: clamp(8.5px, 1.8vw, 11px);
-        }}
-
-        .insight {{
-            min-height: 118px;
+        .metric-badge {{
+            font-size: clamp(6.8px, 1.6vw, 8.2px);
+            padding: 3px 6px;
         }}
     }}
 
     @media (max-width: 520px) {{
-        .kpi-grid {{
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 5px;
-        }}
-
-        .kpi-card {{
-            min-height: 96px;
-            padding: 10px 5px 8px;
-        }}
-
-        .kpi-label {{
-            font-size: clamp(6.8px, 2.05vw, 8.4px);
-        }}
-
-        .kpi-value {{
-            font-size: clamp(11px, 3.8vw, 15px);
-            margin-bottom: 4px;
-        }}
-
-        .kpi-desc {{
-            font-size: clamp(6.3px, 1.75vw, 7.5px);
-        }}
-
-        .main-grid {{
-            grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.9fr);
-            gap: 5px;
-        }}
-
-        .panel {{
-            min-height: 292px;
-            padding: 10px 6px;
+        .metric-card {{
+            min-height: 112px;
+            height: 112px;
+            padding: 11px 7px 8px;
             border-radius: 13px;
         }}
 
-        .panel-title {{
-            font-size: clamp(8.4px, 2.25vw, 10.5px);
+        .metric-title {{
+            font-size: clamp(7.2px, 2.1vw, 9px);
+            margin-bottom: 5px;
         }}
 
-        .panel-subtitle {{
-            font-size: clamp(6.6px, 1.85vw, 8px);
+        .metric-value {{
+            font-size: clamp(12px, 3.8vw, 17px);
+            margin-bottom: 5px;
         }}
 
-        .product-list {{
-            gap: 8px;
+        .metric-description {{
+            font-size: clamp(6.4px, 1.75vw, 7.8px);
         }}
 
-        .product-name {{
-            max-width: 62%;
-        }}
-
-        .product-name,
-        .product-value,
-        .dead-name,
-        .dead-value {{
-            font-size: clamp(6.9px, 1.95vw, 8.6px);
-        }}
-
-        .product-bottom,
-        .dead-meta {{
-            font-size: clamp(6.2px, 1.7vw, 7.4px);
-        }}
-
-        .dead-summary {{
+        .metric-footer {{
             gap: 5px;
-            margin-bottom: 6px;
+            margin-top: 7px;
         }}
 
-        .dead-mini {{
-            padding: 7px 5px;
+        .metric-badge {{
+            font-size: clamp(5.8px, 1.6vw, 7px);
+            padding: 2px 5px;
         }}
 
-        .dead-mini-label {{
-            font-size: clamp(5.8px, 1.65vw, 6.8px);
-        }}
-
-        .dead-mini-value {{
-            font-size: clamp(11px, 3vw, 14px);
-        }}
-
-        .empty-state {{
-            min-height: 150px;
-            padding: 10px 6px;
+        .metric-track {{
+            min-width: 24px;
         }}
     }}
 </style>
 </head>
 
 <body>
-    <div class="dashboard-shell">
-        <div class="view">
-
-            <div class="kpi-grid">
-                <div class="kpi-card">
-                    <div class="kpi-top">
-                        <p class="kpi-label">Valor inmovilizado</p>
-                        <div class="kpi-icon purple">💰</div>
-                    </div>
-                    <h2 class="kpi-value">{formato_pesos(total_valor_inmovilizado)}</h2>
-                    <p class="kpi-desc">Capital estimado detenido en exceso de inventario</p>
-                </div>
-
-                <div class="kpi-card">
-                    <div class="kpi-top">
-                        <p class="kpi-label">Unidades excedentes</p>
-                        <div class="kpi-icon red">📦</div>
-                    </div>
-                    <h2 class="kpi-value">{formato_numero(total_exceso)}</h2>
-                    <p class="kpi-desc">Inventario excedente acumulado en productos</p>
-                </div>
-
-                <div class="kpi-card">
-                    <div class="kpi-top">
-                        <p class="kpi-label">Stock muerto</p>
-                        <div class="kpi-icon orange">⚠️</div>
-                    </div>
-                    <h2 class="kpi-value">{stock_muerto_count:,} productos</h2>
-                    <p class="kpi-desc">Con stock disponible y cero ventas en el periodo</p>
-                </div>
-
-                <div class="kpi-card">
-                    <div class="kpi-top">
-                        <p class="kpi-label">Concentración Top 5</p>
-                        <div class="kpi-icon blue">🎯</div>
-                    </div>
-                    <h2 class="kpi-value">{participacion_top5:.1f}%</h2>
-                    <p class="kpi-desc">Del sobrestock concentrado en solo 5 productos</p>
-                </div>
-            </div>
-
-            <div class="main-grid">
-                <div class="panel products-panel">
-                    <p class="panel-title">Productos que concentran el problema</p>
-
-                    <div class="product-list">
-                        {top5_html}
-                    </div>
-                </div>
-
-                <div class="panel stock-panel">
-                    <p class="panel-title">Stock muerto y movimiento mínimo</p>
-                    <p class="panel-subtitle">Productos sin ventas o con sell-through entre 1% y 5%</p>
-
-                    <div class="dead-summary">
-                        <div class="dead-mini">
-                            <p class="dead-mini-label">Sin ventas</p>
-                            <h3 class="dead-mini-value">{stock_muerto_count:,}</h3>
-                        </div>
-
-                        <div class="dead-mini">
-                            <p class="dead-mini-label">Movimiento mínimo</p>
-                            <h3 class="dead-mini-value">{mov_minimo_count:,}</h3>
-                        </div>
-                    </div>
-
-                    <div class="dead-list">
-                        {stock_muerto_html}
-                    </div>
-                </div>
-            </div>
-
-            <div class="insight-grid">
-                <div class="insight">
-                    <p class="insight-label">Punto de partida</p>
-                    <h3 class="insight-title">{producto_mayor_problema}</h3>
-                    <p class="insight-text">
-                        Es el producto con mayor exceso; debe revisarse antes que el resto del catálogo.
-                    </p>
-                </div>
-
-                <div class="insight">
-                    <p class="insight-label">Impacto económico</p>
-                    <h3 class="insight-title">{formato_pesos(valor_top5)} en Top 5</h3>
-                    <p class="insight-text">
-                        El dinero inmovilizado permite priorizar acciones por impacto financiero, no solo por unidades.
-                    </p>
-                </div>
-
-                <div class="insight">
-                    <p class="insight-label">Acción ejecutiva</p>
-                    <h3 class="insight-title">Liquidar, redistribuir o pausar compra</h3>
-                    <p class="insight-text">
-                        Los productos con stock muerto deben tratarse como prioridad operativa y comercial.
-                    </p>
-                </div>
-            </div>
-
+    <div class="metric-card" style="--accent-color: {accent};">
+        <p class="metric-title">{title}</p>
+        <p class="metric-value">{value}</p>
+        <p class="metric-description">{description}</p>
+        <div class="metric-footer">
+            <span class="metric-badge">{icon} {badge}</span>
+            <div class="metric-track"><div class="metric-fill"></div></div>
         </div>
     </div>
-
-    <script>
-        (function () {{
-            function setFrameHeight() {{
-                const height = Math.ceil(document.documentElement.scrollHeight);
-                window.parent.postMessage({{ type: "streamlit:setFrameHeight", height: height }}, "*");
-            }}
-
-            window.addEventListener("load", setFrameHeight);
-            window.addEventListener("resize", setFrameHeight);
-
-            if ("ResizeObserver" in window) {{
-                new ResizeObserver(setFrameHeight).observe(document.body);
-            }}
-
-            setTimeout(setFrameHeight, 50);
-            setTimeout(setFrameHeight, 300);
-            setTimeout(setFrameHeight, 900);
-        }})();
-    </script>
 </body>
 </html>
 """
 
+dot = lambda color: (
+    f'<span style="display:inline-block;width:11px;height:11px;border-radius:50%;'
+    f'background:{color};margin-right:5px;vertical-align:middle;"></span>'
+)
+
+def _mini_kpi(label, value):
+    label = escape(str(label))
+    value = escape(str(value))
+
+    return f"""
+    <div style="
+        height: clamp(70px, 6vw, 78px);
+        min-height: 70px;
+        box-sizing: border-box;
+        border-radius: clamp(14px, 1.2vw, 18px);
+        padding: clamp(9px, 0.88vw, 12px) clamp(12px, 1.05vw, 16px);
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        border: 1.4px solid rgba(100, 116, 139, 0.38);
+        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.035);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        overflow: hidden;
+    ">
+        <p style="
+            margin: 0 0 clamp(4px, 0.42vw, 6px) 0;
+            font-size: clamp(8.5px, 0.68vw, 10px);
+            font-weight: 950;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: .25px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.1;
+        ">{label}</p>
+        <p style="
+            margin: 0;
+            font-size: clamp(17px, 1.68vw, 24px);
+            font-weight: 950;
+            color: #0f172a;
+            letter-spacing: -0.6px;
+            line-height: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        ">{value}</p>
+    </div>
+    """
+
+
+def section_title(label, subtitle="", popover_title="Ver", popover_body=""):
+    label = escape(str(label))
+    subtitle = escape(str(subtitle))
+
+    col_t, col_p = st.columns([6.5, 1.7])
+
+    with col_t:
+        st.markdown(
+            f"""
+            <div class="chart-card-header">
+                <h3>{label}</h3>
+                <p>{subtitle}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with col_p:
+        if popover_body:
+            st.markdown(
+                "<div style='height:clamp(2px,0.35vw,4px);'></div>",
+                unsafe_allow_html=True
+            )
+
+            with st.popover(popover_title if popover_title else "Ver", use_container_width=True):
+                st.markdown(popover_body)
+
+# COLORES Y UMBRALES
+def period_thresholds(h):
+    return ((1.15)**(h/12)-1)*100, ((1.25)**(h/12)-1)*100
+
+def bar_color(pct, h):
+    r15, r25 = period_thresholds(h)
+    if pct >= r25: return "#16a34a"
+    if pct >= r15: return "#2563eb"
+    return "#dc2626"
+
+def growth_label(pct, h):
+    r15, r25 = period_thresholds(h)
+    if pct >= r25: return "Crecimiento optimo",    "#16a34a"
+    if pct >= r15: return "Crecimiento saludable", "#2563eb"
+    if pct >= 0:   return "Crecimiento moderado",  "#f59e0b"
+    return "En descenso", "#dc2626"
+
+def annualize(pct, h):
+    return ((1+pct/100)**(12/max(h,1))-1)*100
+
+# ACCURACY DEL MODELO
+@st.cache_data(show_spinner=False)
+def compute_model_accuracy() -> float:
+    from prophet import Prophet as _Prophet
+
+    df      = load_data()
+    months  = sorted(df["YearMonth"].unique())
+    errors  = []
+
+    top_region = df["Region"].value_counts().idxmax()
+    df_r = df[df["Region"] == top_region]
+
+    subcats = [
+        sc for sc in df_r["Subcategory"].dropna().unique()
+        if df_r[df_r["Subcategory"] == sc]["YearMonth"].nunique() >= 8
+    ]
+
+    for i in range(6, min(len(months), 6 + 6)):
+        train_m = months[:i]
+        test_m  = months[i]
+
+        for sc in subcats:
+            sub_train = (
+                df_r[(df_r["Subcategory"] == sc) & (df_r["YearMonth"].isin(train_m))]
+                .groupby("YearMonth")
+                .agg(y=("Units_sold", "sum"))
+                .reset_index()
+            )
+            sub_test = (
+                df_r[(df_r["Subcategory"] == sc) & (df_r["YearMonth"] == test_m)]
+                ["Units_sold"].sum()
+            )
+
+            if len(sub_train) < 6 or sub_test == 0:
+                continue
+
+            sub_train["ds"] = sub_train["YearMonth"].dt.to_timestamp()
+            sub_train = sub_train[["ds", "y"]]
+
+            try:
+                m = _Prophet(
+                    changepoint_prior_scale=0.05,
+                    seasonality_mode="additive",
+                    uncertainty_samples=0,
+                    yearly_seasonality=False,
+                    weekly_seasonality=False,
+                    daily_seasonality=False,
+                )
+                if len(sub_train) >= 12:
+                    m.add_seasonality(name="semestral", period=182.5, fourier_order=3)
+
+                m.fit(sub_train)
+                future = m.make_future_dataframe(periods=1, freq="MS")
+                fc     = m.predict(future)
+                yhat   = max(float(fc["yhat"].iloc[-1]), 0)
+
+                ape = abs(sub_test - yhat) / sub_test * 100
+                errors.append(ape)
+            except Exception:
+                continue
+
+    return round(100 - float(np.mean(errors)), 1) if errors else 0.0
+
+# DATOS
+df_maestra     = load_data()
+MODEL_ACCURACY = compute_model_accuracy()
+
+# SIDEBAR
+with st.sidebar:
+    st.markdown(
+        '<div class="sidebar-header"><div class="sidebar-icon">🚀</div>'
+        '<div><p class="sidebar-title">RocketData</p>'
+        '<p class="sidebar-subtitle">Inventory Dashboard</p></div></div>',
+        unsafe_allow_html=True,
+    )
+    st.page_link("Inicio.py",              label="Inicio")
+    st.page_link("pages/1_Inventario.py",  label="Inventario")
+    st.page_link("pages/2_Ventas.py",      label="Ventas")
+    st.page_link("pages/3_Alertas.py",     label="Alertas")
+    st.page_link("pages/4_Pronosticos.py", label="Pronósticos")
+
+    st.divider()
+    st.markdown("### Filtros")
+
+    fecha_min    = df_maestra["Date"].min().date()
+    fecha_max    = df_maestra["Date"].max().date()
+    rango_fechas = st.date_input("Rango de fechas",
+        value=(fecha_min, fecha_max), min_value=fecha_min, max_value=fecha_max)
+
+    regiones   = sorted(df_maestra["Region"].dropna().unique().tolist())
+    region_sel = st.selectbox("Región", ["Todas"] + regiones)
+
+    categorias = sorted(df_maestra["Category"].dropna().unique().tolist())
+    cat_sel    = st.selectbox("Categoría", ["Todas"] + categorias)
+
+    if cat_sel == "Todas":
+        subcategorias = sorted(df_maestra["Subcategory"].dropna().unique().tolist())
+    else:
+        subcategorias = sorted(
+            df_maestra.loc[df_maestra["Category"]==cat_sel,"Subcategory"]
+            .dropna().unique().tolist())
+    subcat_sel = st.selectbox("Subcategoría", ["Todas"] + subcategorias)
+
+    if subcat_sel != "Todas":
+        productos = sorted(df_maestra.loc[df_maestra["Subcategory"]==subcat_sel,"Product_name"].dropna().unique().tolist())
+    elif cat_sel != "Todas":
+        productos = sorted(df_maestra.loc[df_maestra["Category"]==cat_sel,"Product_name"].dropna().unique().tolist())
+    else:
+        productos = sorted(df_maestra["Product_name"].dropna().unique().tolist())
+    product_sel = st.selectbox("Producto", ["Todas"] + productos)
+
+    st.divider()
+    horizon = st.radio("Horizonte forecast", [3, 6], horizontal=True,
+                       format_func=lambda x: f"{x} meses")
+
+# FILTROS
+def apply_date(df):
+    if isinstance(rango_fechas, tuple) and len(rango_fechas)==2:
+        fi, ff = rango_fechas
+        return df[(df["Date"].dt.date>=fi)&(df["Date"].dt.date<=ff)]
+    return df
+
+df_filtrado = apply_date(df_maestra.copy())
+if region_sel  != "Todas": df_filtrado = df_filtrado[df_filtrado["Region"]       == region_sel]
+if cat_sel     != "Todas": df_filtrado = df_filtrado[df_filtrado["Category"]     == cat_sel]
+if subcat_sel  != "Todas": df_filtrado = df_filtrado[df_filtrado["Subcategory"]  == subcat_sel]
+if product_sel != "Todas": df_filtrado = df_filtrado[df_filtrado["Product_name"] == product_sel]
+
+df_base_kpi = apply_date(df_maestra.copy())
+if region_sel != "Todas": df_base_kpi = df_base_kpi[df_base_kpi["Region"]   == region_sel]
+if cat_sel    != "Todas": df_base_kpi = df_base_kpi[df_base_kpi["Category"] == cat_sel]
+
+if df_filtrado.empty:
+    st.warning("No hay datos para los filtros seleccionados.")
+    st.stop()
+
+region_prophet = region_sel if region_sel != "Todas" else df_maestra["Region"].mode()[0]
+subcat_prophet = subcat_sel if subcat_sel != "Todas" else None
+region_label   = REG_LABEL.get(region_sel, region_sel) if region_sel != "Todas" else "Todas las regiones"
+ref15, ref25   = period_thresholds(horizon)
+
+# PROPHET — FUENTE ÚNICA DE VERDAD
+with st.spinner("Calculando pronósticos..."):
+    forecast_df  = build_forecast_summary(df_base_kpi, region_prophet, horizon)
+    region_fc_df = build_region_forecast(horizon)
+
+if forecast_df.empty:
+    st.warning("No hay datos suficientes para los filtros actuales.")
+    st.stop()
+
+# KPIs globales
+kpi_total_units  = (forecast_df["Forecast_avg"] * horizon).sum()
+kpi_hist_units   = (forecast_df["Hist_avg"]     * horizon).sum()
+kpi_growth_total = ((kpi_total_units - kpi_hist_units) / kpi_hist_units * 100) if kpi_hist_units > 0 else 0.0
+
+if not forecast_df.empty and forecast_df["Hist_avg"].sum() > 0:
+    kpi_growth_ponderado = (
+        (forecast_df["Growth_pct"] * forecast_df["Hist_avg"]).sum()
+        / forecast_df["Hist_avg"].sum()
+    )
+else:
+    kpi_growth_ponderado = kpi_growth_total
+
+fc_sorted  = forecast_df.sort_values("Growth_pct", ascending=False)
+best_row   = fc_sorted.iloc[0];  best_name  = best_row["Subcategory"];  best_pct  = best_row["Growth_pct"]
+worst_row  = fc_sorted.iloc[-1]; worst_name = worst_row["Subcategory"]; worst_pct = worst_row["Growth_pct"]
+best_badge,  best_accent  = growth_label(best_pct,  horizon)
+worst_badge, worst_accent = growth_label(worst_pct, horizon)
+
 # =========================
-# Render
+# Encabezado compacto
 # =========================
+ctx_parts = []
+if cat_sel     != "Todas": ctx_parts.append(f"Cat: {cat_sel}")
+if subcat_sel  != "Todas": ctx_parts.append(f"Sub: {subcat_sel}")
+if product_sel != "Todas": ctx_parts.append(f"Prod: {product_sel}")
+ctx_parts.append(f"{horizon} meses")
+ctx_str = "  ·  ".join(ctx_parts)
+
 st.markdown(
-    '<h1 class="main-title">Impacto del Inventario</h1>',
+    f'<h1 class="main-title">Panel de Pronósticos</h1>'
+    f'<p class="forecast-context">{escape(str(region_label))}  ·  {escape(str(ctx_str))}</p>',
     unsafe_allow_html=True
 )
 
-components.html(
-    dashboard_html,
-    height=820,          
-    scrolling=False
-)
+
+# 3 TABS
+tab_resumen, tab_analisis, tab_redist = st.tabs([
+    "Resumen",
+    "Análisis",
+    "Redistribución",
+])
+
+with tab_resumen:
+
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        t1_badge, t1_accent = growth_label(kpi_growth_total, horizon)
+        sign_t  = "+" if kpi_growth_total  >= 0 else ""
+        sign_wp = "+" if kpi_growth_ponderado >= 0 else ""
+        components.html(metric_card(
+            f"Unidades estimadas · {horizon} meses", f"{kpi_total_units:,.0f} uds",
+            f"Histórico: {kpi_hist_units:,.0f} uds · Total: {sign_t}{kpi_growth_total:.1f}% · Ponderado: {sign_wp}{kpi_growth_ponderado:.1f}%",
+            t1_badge, "→", t1_accent,
+            min(abs(kpi_growth_total/ref25*100) if ref25>0 else 70, 100),
+        ), height=170, scrolling=False)
+
+    with c2:
+        components.html(metric_card(
+            f"Mejor subcategoria · {horizon} meses", best_name,
+            f"+{best_pct:.1f}% según Prophet · {annualize(best_pct,horizon):+.1f}% anualizado",
+            best_badge, "+", best_accent,
+            min(abs(best_pct/ref25*100) if ref25>0 else 0, 100),
+        ), height=170, scrolling=False)
+
+    with c3:
+        sign3 = "+" if worst_pct >= 0 else ""
+        components.html(metric_card(
+            f"Menor alza · {horizon} meses", worst_name,
+            f"{sign3}{worst_pct:.1f}% según Prophet · {annualize(worst_pct,horizon):+.1f}% anualizado",
+            worst_badge, "!", worst_accent,
+            min(abs(worst_pct/ref25*100) if ref25>0 else 0, 100),
+        ), height=170, scrolling=False)
+
+    st.divider()
+
+    col_bar, col_acc = st.columns([3, 1], gap="large")
+
+    with col_bar:
+        section_title(
+            "Crecimiento por subcategoría",
+            subtitle=f"{region_label} · Prophet · {horizon} meses",
+        )
+
+        fc_bar = forecast_df.sort_values("Growth_pct", ascending=False)
+        colors_bar = [bar_color(v, horizon) for v in fc_bar["Growth_pct"]]
+
+        fig_bar = go.Figure()
+
+        fig_bar.add_trace(go.Bar(
+            x=fc_bar["Growth_pct"],
+            y=fc_bar["Subcategory"],
+            orientation="h",
+            text=[f"{v:+.1f}%" for v in fc_bar["Growth_pct"]],
+            textposition="outside",
+            cliponaxis=False,
+            marker=dict(color=colors_bar, opacity=0.88),
+            customdata=np.stack(
+                [
+                    fc_bar["Forecast_avg"] * horizon,
+                    fc_bar["Hist_avg"] * horizon
+                ],
+                axis=-1
+            ),
+            hovertemplate=(
+                "<b>%{y}</b><br>Crecimiento: %{x:+.1f}%<br>"
+                "Forecast total: %{customdata[0]:,.0f} uds<br>"
+                "Histórico total: %{customdata[1]:,.0f} uds<extra></extra>"
+            ),
+        ))
+
+        fig_bar.add_vline(x=ref15, line=dict(color="#f59e0b", width=2.5, dash="dot"))
+        fig_bar.add_vline(x=ref25, line=dict(color="#16a34a", width=2.5, dash="dot"))
+
+        fig_bar.add_annotation(
+            x=ref15, y=1.15, xref="x", yref="paper",
+            text=f"15% anual ({ref15:.1f}% en {horizon}m)",
+            showarrow=False, font=dict(color="#b45309", size=10),
+            bgcolor="rgba(255,255,255,0.95)", bordercolor="rgba(245,158,11,0.30)",
+            borderwidth=2, borderpad=4, xanchor="center", yanchor="bottom", xshift=-28
+        )
+
+        fig_bar.add_annotation(
+            x=ref25, y=1.05, xref="x", yref="paper",
+            text=f"25% anual ({ref25:.1f}% en {horizon}m)",
+            showarrow=False, font=dict(color="#15803d", size=10),
+            bgcolor="rgba(255,255,255,0.95)", bordercolor="rgba(22,163,74,0.30)",
+            borderwidth=2, borderpad=4, xanchor="center", yanchor="bottom", xshift=28
+        )
+
+        x_min = min(0, fc_bar["Growth_pct"].min(), ref15, ref25)
+        x_max = max(fc_bar["Growth_pct"].max(), ref15, ref25)
+        padding = (x_max - x_min) * 0.18 if x_max != x_min else 1
+
+        fig_bar.update_layout(
+            height=300,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
+            margin=dict(l=10, r=120, t=70, b=30),
+            yaxis=dict(autorange="reversed", tickfont=dict(size=12), automargin=True),
+            xaxis=dict(
+                title=f"Crecimiento Prophet en {horizon} meses (%)",
+                showgrid=True, gridcolor="rgba(0,0,0,0.18)",
+                zeroline=True, zerolinecolor="rgba(0,0,0,0.35)", zerolinewidth=2,
+                range=[x_min, x_max + padding]
+            ),
+        )
+
+        st.plotly_chart(fig_bar, use_container_width=True, config={"displayModeBar": False, "responsive": True})
+
+    with col_acc:
+        section_title("Confiabilidad", subtitle="Walk-forward · histórico")
+
+        acc_color = (
+            "#16a34a" if MODEL_ACCURACY >= 85
+            else "#f59e0b" if MODEL_ACCURACY >= 75
+            else "#dc2626"
+        )
+
+        fig_gauge = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=MODEL_ACCURACY,
+            domain={"x": [0.08, 0.92], "y": [0.06, 0.68]},
+            number=dict(suffix="%", font=dict(size=34, color="#0f172a", family="Inter, system-ui, sans-serif")),
+            gauge=dict(
+                shape="angular",
+                axis=dict(range=[0, 100], tickwidth=2, tickcolor="#cbd5e1", tickfont=dict(size=10, color="#64748b")),
+                bar=dict(color=acc_color, thickness=0.50),
+                bgcolor="#f8fafc",
+                borderwidth=0,
+                steps=[
+                    dict(range=[0, 75],   color="#fee2e2"),
+                    dict(range=[75, 85],  color="#fef3c7"),
+                    dict(range=[85, 100], color="#dcfce7")
+                ],
+                threshold=dict(line=dict(color="#0f172a", width=2), thickness=0.75, value=MODEL_ACCURACY),
+            ),
+        ))
+
+        fig_gauge.update_layout(
+            height=300,
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=10, r=10, t=10, b=10),
+            font=dict(family="Inter, system-ui, sans-serif", color="#0f172a"),
+            annotations=[dict(
+                text=(
+                    "Accuracy general<br>"
+                    "<span style='font-size:12px;color:#64748b'>"
+                    "Walk-forward · datos históricos</span>"
+                ),
+                x=0.5, y=0.96, xref="paper", yref="paper",
+                showarrow=False, align="center",
+                font=dict(size=15, color="#0f172a", family="Inter, system-ui, sans-serif")
+            )]
+        )
+
+        st.plotly_chart(fig_gauge, use_container_width=True, config={"displayModeBar": False, "responsive": True})
+
+
+# ─────────────────────────────────────────────────────────────────────
+# TAB 2 — ANÁLISIS
+# ─────────────────────────────────────────────────────────────────────
+with tab_analisis:
+
+    if product_sel != "Todas":
+        @st.cache_data(show_spinner=False)
+        def fit_prophet_product(product_name, region, periods):
+            df   = load_data()
+            mask = (df["Product_name"]==product_name) & (df["Region"]==region)
+            sub  = df[mask].groupby("YearMonth").agg(y=("Units_sold","sum")).reset_index()
+            if len(sub) < 6: return None, None
+            sub["ds"] = sub["YearMonth"].dt.to_timestamp()
+            sub = sub[["ds","y"]]
+            from prophet import Prophet as _P
+            m = _P(changepoint_prior_scale=0.05, seasonality_mode="additive",
+                   uncertainty_samples=300, yearly_seasonality=False,
+                   weekly_seasonality=False, daily_seasonality=False)
+            if len(sub) >= 12:
+                m.add_seasonality(name="semestral", period=182.5, fourier_order=3)
+            m.fit(sub); future = m.make_future_dataframe(periods=periods, freq="MS")
+            return sub, m.predict(future)
+        hist_df, fc_df = fit_prophet_product(product_sel, region_prophet, horizon)
+        chart_label = product_sel
+
+    elif subcat_prophet is not None:
+        hist_df, fc_df = fit_prophet("Subcategory", subcat_prophet, region_prophet, horizon)
+        chart_label = subcat_prophet
+
+    else:
+        sub_base = (
+            df_base_kpi.groupby("YearMonth").agg(y=("Units_sold","sum")).reset_index()
+        )
+        if len(sub_base) >= 6:
+            sub_base["ds"] = sub_base["YearMonth"].dt.to_timestamp()
+            sub_base = sub_base[["ds","y"]]
+            from prophet import Prophet as _P
+            _m = _P(changepoint_prior_scale=0.05, seasonality_mode="additive",
+                    uncertainty_samples=300, yearly_seasonality=False,
+                    weekly_seasonality=False, daily_seasonality=False)
+            if len(sub_base) >= 12:
+                _m.add_seasonality(name="semestral", period=182.5, fourier_order=3)
+            _m.fit(sub_base)
+            _future = _m.make_future_dataframe(periods=horizon, freq="MS")
+            hist_df = sub_base; fc_df = _m.predict(_future)
+        else:
+            hist_df, fc_df = None, None
+        cat_label   = cat_sel if cat_sel != "Todas" else "Todas las categorías"
+        chart_label = cat_label
+
+    if hist_df is not None:
+        future_fc = fc_df[fc_df["ds"] > hist_df["ds"].max()]
+        delta     = future_fc["yhat"].mean() - hist_df["y"].mean()
+        sign_d    = "+" if delta >= 0 else ""
+
+        section_title(
+            "Demanda proyectada",
+            subtitle=f"{chart_label}  ·  {region_label}  ·  {horizon} meses  ·  "
+                     f"Forecast: {int(future_fc['yhat'].mean()):,} uds/mes  ·  "
+                     f"Var: {sign_d}{delta:,.0f} uds/mes",
+            popover_title="",
+            popover_body=(
+                "**Línea azul** — ventas históricas reales por mes  \n\n"
+                "**Línea verde punteada** — demanda proyectada por Prophet  \n\n"
+                "**Banda azul** — intervalo de confianza  \n\n"
+            ),
+        )
+
+        fig_dem = go.Figure()
+        fig_dem.add_trace(go.Scatter(
+            x=pd.concat([future_fc["ds"], future_fc["ds"][::-1]]),
+            y=pd.concat([future_fc["yhat_upper"], future_fc["yhat_lower"][::-1]]),
+            fill="toself", fillcolor="rgba(37,99,235,.08)",
+            line=dict(color="rgba(0,0,0,0)"), hoverinfo="skip", name="IC",
+        ))
+        fig_dem.add_trace(go.Scatter(
+            x=hist_df["ds"], y=hist_df["y"], mode="lines+markers", name="Histórico",
+            line=dict(color="#2563eb", width=3), marker=dict(size=6, color="#2563eb"),
+            hovertemplate="<b>%{x|%b %Y}</b><br>%{y:,.0f} uds<extra></extra>",
+        ))
+        fig_dem.add_trace(go.Scatter(
+            x=future_fc["ds"], y=future_fc["yhat"],
+            mode="lines+markers", name=f"Forecast ({horizon}m)",
+            line=dict(color="#16a34a", width=2.5, dash="dot"),
+            marker=dict(size=6, symbol="diamond", color="#16a34a"),
+            hovertemplate="<b>%{x|%b %Y}</b><br>%{y:,.0f} uds<extra></extra>",
+        ))
+        fig_dem.update_layout(
+            height=260, hovermode="x unified",
+            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
+            margin=dict(l=40, r=20, t=5, b=25),
+            xaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.18)", tickfont=dict(size=9)),
+            yaxis=dict(title="uds", showgrid=True, gridcolor="rgba(0,0,0,0.18)", tickfont=dict(size=9)),
+            legend=dict(orientation="h", y=1.15, x=0, font=dict(size=9)),
+        )
+        st.plotly_chart(fig_dem, use_container_width=True, config={"displayModeBar": False, "responsive": True})
+    else:
+        st.info("Sin datos suficientes (mínimo 6 meses).")
+
+    month_names = {1:"Ene",2:"Feb",3:"Mar",4:"Abr",5:"May",6:"Jun",
+                   7:"Jul",8:"Ago",9:"Sep",10:"Oct",11:"Nov",12:"Dic"}
+
+    seas_m = df_filtrado.groupby("YearMonth")["Units_sold"].sum().reset_index()
+    seas_m["Month"] = seas_m["YearMonth"].dt.month
+    seasonality = seas_m.groupby("Month")["Units_sold"].mean().reset_index()
+    seasonality["Month_name"] = seasonality["Month"].map(month_names)
+    seasonality = seasonality.sort_values("Month")
+    global_avg  = seasonality["Units_sold"].mean()
+    seas_colors = [
+        "#16a34a" if v >= global_avg*1.05
+        else "#dc2626" if v <= global_avg*0.95
+        else "#2563eb"
+        for v in seasonality["Units_sold"]
+    ]
+    peak_m = seasonality.loc[seasonality["Units_sold"].idxmax(), "Month_name"]
+    variab = (seasonality["Units_sold"].max()-seasonality["Units_sold"].min())/global_avg*100
+
+    with st.spinner(""):
+        fc3 = build_region_forecast(3)
+        fc6 = build_region_forecast(6)
+    fc3 = fc3.rename(columns={"Forecast_total":"fc3","Growth_pct":"gp3"})
+    fc6 = fc6.rename(columns={"Forecast_total":"fc6","Growth_pct":"gp6"})
+    region_compare = fc3[["Region_label","fc3","gp3"]].merge(
+        fc6[["Region_label","fc6","gp6"]], on="Region_label"
+    ).sort_values("fc6", ascending=True)
+
+    col_seas, col_reg = st.columns([1, 1], gap="large")
+
+    with col_seas:
+        section_title(
+            "Estacionalidad mensual",
+            subtitle=f"Pico: {peak_m}  ·  Variabilidad: {variab:.0f}%",
+            popover_title="",
+            popover_body=(
+                "Promedio de ventas por mes del año.  \n\n"
+                "**Verde** — mes >5% sobre el promedio  \n\n"
+                "**Rojo** — mes >5% bajo el promedio  \n\n"
+                "**Azul** — mes dentro del rango promedio"
+            ),
+        )
+        fig_seas = go.Figure()
+        fig_seas.add_hline(y=global_avg, line=dict(color="#94a3b8",width=2,dash="dot"),
+            annotation_text="Prom.", annotation_position="right",
+            annotation_font=dict(color="#64748b",size=8))
+        fig_seas.add_trace(go.Bar(
+            x=seasonality["Month_name"], y=seasonality["Units_sold"],
+            marker=dict(color=seas_colors, opacity=0.88),
+            hovertemplate="<b>%{x}</b><br>%{y:,.0f} uds<extra></extra>",
+        ))
+        fig_seas.update_layout(
+            height=250, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
+            margin=dict(l=10, r=20, t=5, b=25),
+            xaxis=dict(showgrid=False, tickfont=dict(size=9)),
+            yaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.18)",
+                       tickfont=dict(size=9), tickformat=",.0f"),
+        )
+        st.plotly_chart(fig_seas, use_container_width=True, config={"displayModeBar": False, "responsive": True})
+
+    with col_reg:
+        section_title(
+            "Forecast por región",
+            subtitle="Prophet · sin filtros · 3m vs 6m",
+            popover_title="",
+            popover_body=(
+                "Demanda total proyectada por Prophet para cada región.  \n\n"
+                "**Azul** — forecast a 3 meses  \n\n"
+                "**Verde** — forecast a 6 meses"
+            ),
+        )
+        fig_comp = go.Figure()
+        fig_comp.add_trace(go.Bar(
+            name="3m", y=region_compare["Region_label"], x=region_compare["fc3"],
+            orientation="h", marker=dict(color="#2563eb", opacity=0.80),
+            hovertemplate="<b>%{y}</b><br>3m: %{x:,.0f} uds<extra></extra>",
+        ))
+        fig_comp.add_trace(go.Bar(
+            name="6m", y=region_compare["Region_label"], x=region_compare["fc6"],
+            orientation="h", marker=dict(color="#16a34a", opacity=0.80),
+            hovertemplate="<b>%{y}</b><br>6m: %{x:,.0f} uds<extra></extra>",
+        ))
+        fig_comp.update_layout(
+            barmode="group", height=250,
+            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
+            margin=dict(l=10, r=10, t=5, b=25),
+            legend=dict(orientation="h", y=1.15, x=0, font=dict(size=9)),
+            yaxis=dict(tickfont=dict(size=9)),
+            xaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.18)",
+                       tickfont=dict(size=9), tickformat=",.0f"),
+        )
+        st.plotly_chart(fig_comp, use_container_width=True, config={"displayModeBar": False, "responsive": True})
+
+
+# ─────────────────────────────────────────────────────────────────────
+# TAB 3 — REDISTRIBUCIÓN
+# ─────────────────────────────────────────────────────────────────────
+with tab_redist:
+
+    col_th, col_p1, col_toggle = st.columns([3, 1, 2])
+    with col_th:
+        st.markdown(
+            """
+            <div class="chart-card-header">
+                <h3>Redistribución de inventario</h3>
+                <p>Plan de transferencia basado en demanda proyectada y exceso de stock.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with col_p1:
+        with st.popover("¿Cómo funciona?", use_container_width=True):
+            st.markdown(
+                f"Detecta el **producto más débil** por subcategoría y región y lo "
+                f"redistribuye hacia donde hay mayor demanda proyectada a **{horizon} meses**. "
+                f"Transferencias en **6 oleadas bisemanales** proporcionales a la demanda del destino."
+            )
+            st.markdown("---")
+            st.markdown(
+                f"{dot('#ef4444')} **Rojo** — Envía stock  \n"
+                f"{dot('#22c55e')} **Verde** — Recibe stock  \n"
+                f"{dot('#3b82f6')} **Azul** — Sin movimiento  \n"
+                "**Grosor** — proporcional a unidades en tránsito",
+                unsafe_allow_html=True,
+            )
+    with col_toggle:
+        vista_redist = st.radio(
+            "", ["Mapa", "Plan de envíos"],
+            horizontal=True, label_visibility="collapsed",
+        )
+
+    with st.spinner("Calculando..."):
+        subcat_region_forecast = build_subcat_region_forecast(df_maestra, horizon)
+        fc_monthly             = build_monthly_forecast(horizon)
+
+    df_work = df_maestra.copy()
+    if "Excess_stock" not in df_work.columns:
+        _demand_col = "Units_expected" if "Units_expected" in df_work.columns else "Units_sold"
+        df_work["Excess_stock"] = (df_work["Stock"] - df_work[_demand_col]).clip(lower=0)
+
+    redist_base_df    = build_redist_base(df_work, subcat_region_forecast, horizon)
+    pares_df, plan_df = build_wave_plan(df_work, redist_base_df, fc_monthly, horizon)
+
+    if plan_df.empty:
+        st.info("No se encontraron transferencias.")
+        st.stop()
+
+    oleadas       = sorted(plan_df["Oleada"].unique())
+    primera_fecha = plan_df["Fecha_envío"].iloc[0]
+    ultima_fecha  = plan_df[plan_df["Oleada"]==oleadas[-1]]["Fecha_envío"].iloc[0]
+
+    km1, km2, km3, km4 = st.columns(4)
+    with km1:
+        st.markdown(_mini_kpi("Productos", str(plan_df["Producto"].nunique())), unsafe_allow_html=True)
+    with km2:
+        st.markdown(_mini_kpi("Unidades totales", f"{plan_df['Unidades_oleada'].sum():,} uds"), unsafe_allow_html=True)
+    with km3:
+        st.markdown(_mini_kpi("Pares origen→destino", str(len(pares_df))), unsafe_allow_html=True)
+    with km4:
+        st.markdown(_mini_kpi("Período", f"{primera_fecha} – {ultima_fecha}"), unsafe_allow_html=True)
+
+    st.markdown("<div style='margin-top:6px;'></div>", unsafe_allow_html=True)
+
+    if vista_redist == "Mapa":
+        frames, slider_steps, init_nodes, init_routes, init_annotation, n_frames = \
+            build_animation_frames(plan_df, horizon)
+
+        fig_map = go.Figure(
+            data=[init_nodes] + init_routes,
+            frames=frames,
+            layout=go.Layout(
+                height=520,
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
+                margin=dict(l=0, r=0, t=40, b=0),
+                geo=GEO_LAYOUT,
+                annotations=[init_annotation],
+                title=dict(
+                    text=f"Plan de {n_frames} transferencias  ·  ▶ Play para iniciar",
+                    font=dict(size=12, color="#64748b"),
+                    x=0.5, xanchor="center",
+                ),
+                updatemenus=[dict(
+                    type="buttons", showactive=False, direction="left",
+                    x=0.5, xanchor="center", y=-0.04, yanchor="top",
+                    bgcolor="#f1f5f9", bordercolor="rgba(148,163,184,.4)",
+                    font=dict(color="#0f172a", size=12),
+                    pad=dict(r=8, t=8),
+                    buttons=[
+                        dict(label="▶  Play", method="animate",
+                             args=[None, dict(frame=dict(duration=2000, redraw=True),
+                                              fromcurrent=True,
+                                              transition=dict(duration=400, easing="cubic-in-out"))]),
+                        dict(label="⏸  Pausa", method="animate",
+                             args=[[None], dict(frame=dict(duration=0, redraw=False), mode="immediate")]),
+                    ],
+                )],
+                sliders=[dict(
+                    active=0,
+                    currentvalue=dict(prefix="", visible=True, font=dict(size=11, color="#64748b")),
+                    pad=dict(t=45, b=8, l=20, r=20),
+                    len=0.92, x=0.04,
+                    bgcolor="#f8fafc", bordercolor="rgba(148,163,184,.3)",
+                    borderwidth=2, font=dict(color="#334155", size=10),
+                    steps=slider_steps, tickcolor="rgba(148,163,184,.4)",
+                )],
+            ),
+        )
+        st.plotly_chart(fig_map, use_container_width=True, config={"displayModeBar": False, "responsive": True})
+
+    else:
+        base_oleadas = (
+            plan_df
+            .groupby(["Producto", "Subcategoría", "Origen_label", "Destino_label", "Oleada"])
+            ["Unidades_oleada"].sum()
+            .reset_index()
+        )
+
+        oleadas_presentes = sorted(base_oleadas["Oleada"].unique())
+        pivot = base_oleadas.pivot_table(
+            index=["Producto", "Subcategoría", "Origen_label", "Destino_label"],
+            columns="Oleada",
+            values="Unidades_oleada",
+            aggfunc="sum",
+            fill_value=0,
+        ).reset_index()
+        pivot.columns.name = None
+        pivot = pivot.rename(columns={
+            "Origen_label":  "Origen",
+            "Destino_label": "Destino",
+            **{o: f"Oleada {o}" for o in oleadas_presentes},
+        })
+
+        col_olas = [f"Oleada {o}" for o in oleadas_presentes]
+        pivot["Total oleadas"] = pivot[col_olas].sum(axis=1)
+        pivot = pivot.sort_values("Total oleadas", ascending=False)
+
+        dist_map = (
+            plan_df
+            .groupby(["Producto", "Subcategoría", "Origen_label", "Destino_label"])
+            ["Distancia_km"].first()
+            .reset_index()
+            .rename(columns={"Origen_label": "Origen", "Destino_label": "Destino"})
+        )
+        resumen = pivot.merge(dist_map, on=["Producto", "Subcategoría", "Origen", "Destino"], how="left")
+        resumen = resumen.rename(columns={"Distancia_km": "Dist. (km)"})
+        cols_finales = ["Producto", "Subcategoría", "Origen", "Destino"] + col_olas + ["Total oleadas", "Dist. (km)"]
+        resumen = resumen[cols_finales]
+
+        u_ola = (
+            plan_df
+            .groupby(["Oleada", "Mes_num", "Fecha_envío"])["Unidades_oleada"]
+            .sum()
+            .reset_index()
+            .sort_values("Oleada")
+        )
+
+        PALETA_MESES = {1:"#3b82f6",2:"#22c55e",3:"#f59e0b",4:"#a855f7",5:"#ef4444",6:"#eab308"}
+        mes_labels = (
+            plan_df[["Mes_num","Mes_pronóstico"]]
+            .drop_duplicates("Mes_num")
+            .sort_values("Mes_num")
+            .set_index("Mes_num")["Mes_pronóstico"]
+            .to_dict()
+        )
+
+        PANEL_H = 320
+        col_tabla, col_chart = st.columns([1, 1], gap="large")
+
+        with col_tabla:
+            st.markdown(
+                "<h4 style='margin:0 0 8px 0; font-size:1rem; color:#1e3a5f;'>"
+                "Resumen de transferencias por producto"
+                "</h4>",
+                unsafe_allow_html=True,
+            )
+            st.dataframe(resumen, use_container_width=True, hide_index=True, height=PANEL_H)
+
+        with col_chart:
+            st.markdown(
+                "<h4 style='margin:0 0 8px 0; font-size:1rem; color:#1e3a5f;'>"
+                "Unidades por oleada"
+                "</h4>",
+                unsafe_allow_html=True,
+            )
+
+            fig_prog = go.Figure()
+            fig_prog.add_trace(go.Bar(
+                x=[f"Oleada {int(r.Oleada)}<br>{r.Fecha_envío}" for _, r in u_ola.iterrows()],
+                y=u_ola["Unidades_oleada"],
+                marker=dict(color=[PALETA_MESES.get(int(m), "#94a3b8") for m in u_ola["Mes_num"]], opacity=0.88),
+                text=[f"{int(u):,} uds" for u in u_ola["Unidades_oleada"]],
+                textposition="outside",
+                textfont=dict(size=9),
+                hovertemplate="<b>%{x}</b><br>%{y:,} unidades<extra></extra>",
+            ))
+            fig_prog.update_layout(
+                height=PANEL_H,
+                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#0f172a", family="Inter, system-ui, sans-serif"),
+                margin=dict(l=10, r=10, t=8, b=60),
+                xaxis=dict(showgrid=False, tickfont=dict(size=8)),
+                yaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.18)", tickfont=dict(size=9)),
+                showlegend=False,
+            )
+            st.plotly_chart(fig_prog, use_container_width=True, config={"displayModeBar": False, "responsive": True})
+
+            emojis = ["🔵","🟢","🟠","🟣","🔴","🟡"]
+            caption_parts = [
+                f"{emojis[m-1]} {mes_labels.get(m, f'Mes {m}')}"
+                for m in sorted(mes_labels.keys())
+            ]
+            st.caption("  ·  ".join(caption_parts))
