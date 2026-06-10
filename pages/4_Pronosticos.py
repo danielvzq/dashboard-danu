@@ -987,7 +987,7 @@ with tab_resumen:
         ))
 
         fig_bar.add_vline(x=ref15, line=dict(color="#f59e0b", width=2.5, dash="dot"))
-        fig_bar.add_vline(x=ref25, line=dict(color="#16a34a", width=2.5, dash="dot"))
+        fig_bar.add_vline(x=ref25, line=dict(color="#0138FF", width=2.5, dash="dot"))
 
         fig_bar.add_annotation(
             x=ref15, y=1.15, xref="x", yref="paper",
@@ -1000,8 +1000,8 @@ with tab_resumen:
         fig_bar.add_annotation(
             x=ref25, y=1.05, xref="x", yref="paper",
             text=f"25% anual ({ref25:.1f}% en {horizon}m)",
-            showarrow=False, font=dict(color="#15803d", size=10),
-            bgcolor="rgba(255,255,255,0.95)", bordercolor="rgba(22,163,74,0.30)",
+            showarrow=False, font=dict(color="#0B3CEE", size=10),
+            bgcolor="rgba(255,255,255,0.95)", bordercolor="rgba(37,99,235,0.30)",
             borderwidth=2, borderpad=4, xanchor="center", yanchor="bottom", xshift=28
         )
 
@@ -1028,54 +1028,57 @@ with tab_resumen:
 
         st.plotly_chart(fig_bar, use_container_width=True, config={"displayModeBar": False, "responsive": True})
 
-    with col_acc:
-        section_title("Confiabilidad", subtitle="Walk-forward · histórico")
+with col_acc:
 
-        acc_color = (
-            "#16a34a" if MODEL_ACCURACY >= 85
-            else "#f59e0b" if MODEL_ACCURACY >= 75
-            else "#dc2626"
-        )
+    st.markdown(
+        "<div style='height: 100px;'></div>",
+        unsafe_allow_html=True,
+    )
 
-        fig_gauge = go.Figure(go.Indicator(
-            mode="gauge+number",
-            value=MODEL_ACCURACY,
-            domain={"x": [0.08, 0.92], "y": [0.06, 0.68]},
-            number=dict(suffix="%", font=dict(size=34, color="#0f172a", family="Inter, system-ui, sans-serif")),
-            gauge=dict(
-                shape="angular",
-                axis=dict(range=[0, 100], tickwidth=2, tickcolor="#cbd5e1", tickfont=dict(size=10, color="#64748b")),
-                bar=dict(color=acc_color, thickness=0.50),
-                bgcolor="#f8fafc",
-                borderwidth=0,
-                steps=[
-                    dict(range=[0, 75],   color="#fee2e2"),
-                    dict(range=[75, 85],  color="#fef3c7"),
-                    dict(range=[85, 100], color="#dcfce7")
-                ],
-                threshold=dict(line=dict(color="#0f172a", width=2), thickness=0.75, value=MODEL_ACCURACY),
+    acc_color = (
+        "#16a34a" if MODEL_ACCURACY >= 85
+        else "#f59e0b" if MODEL_ACCURACY >= 75
+        else "#dc2626"
+    )
+
+    fig_gauge = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=MODEL_ACCURACY,
+        domain={"x": [0.05, 0.85], "y": [0.15, 0.95]},
+        number=dict(suffix="%", font=dict(size=38, color="#0f172a", family="Inter, system-ui, sans-serif")),
+        gauge=dict(
+            shape="angular",
+            axis=dict(range=[0, 100], tickwidth=1, tickcolor="#cbd5e1", tickfont=dict(size=9, color="#64748b")),
+            bar=dict(color=acc_color, thickness=0.45),
+            bgcolor="#f8fafc",
+            borderwidth=0,
+            steps=[
+                dict(range=[0, 75],   color="#fee2e2"),
+                dict(range=[75, 85],  color="#fef3c7"),
+                dict(range=[85, 100], color="#dcfce7")
+            ],
+            threshold=dict(line=dict(color="#0f172a", width=2), thickness=0.75, value=MODEL_ACCURACY),
+        ),
+    ))
+
+    fig_gauge.update_layout(
+        height=340,
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=20, r=20, t=30, b=30),
+        font=dict(family="Inter, system-ui, sans-serif", color="#0f172a"),
+        annotations=[dict(
+            text=(
+                "Confiabilidad<br>"
+                "<span style='font-size:11px;color:#64748b'>"
+                "Walk-forward · histórico</span>"
             ),
-        ))
+            x=0.2, y=1.0, xref="paper", yref="paper",
+            showarrow=False, align="center",
+            font=dict(size=15, color="#0f172a", family="Inter, system-ui, sans-serif")
+        )]
+    )
 
-        fig_gauge.update_layout(
-            height=340,
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=12, r=12, t=14, b=18),
-            font=dict(family="Inter, system-ui, sans-serif", color="#0f172a"),
-            annotations=[dict(
-                text=(
-                    "Accuracy general<br>"
-                    "<span style='font-size:12px;color:#64748b'>"
-                    "Walk-forward · datos históricos</span>"
-                ),
-                x=0.5, y=0.96, xref="paper", yref="paper",
-                showarrow=False, align="center",
-                font=dict(size=15, color="#0f172a", family="Inter, system-ui, sans-serif")
-            )]
-        )
-
-        st.plotly_chart(fig_gauge, use_container_width=True, config={"displayModeBar": False, "responsive": True})
-
+    st.plotly_chart(fig_gauge, use_container_width=True, config={"displayModeBar": False, "responsive": True})
 
 # ─────────────────────────────────────────────────────────────────────
 # TAB 2 — ANÁLISIS
@@ -1424,7 +1427,7 @@ with tab_redist:
         )
         resumen = pivot.merge(dist_map, on=["Producto", "Subcategoría", "Origen", "Destino"], how="left")
         resumen = resumen.rename(columns={"Distancia_km": "Dist. (km)"})
-        cols_finales = ["Producto", "Subcategoría", "Origen", "Destino"] + col_olas + ["Total oleadas", "Dist. (km)"]
+        cols_finales = ["Producto", "Subcategoría", "Origen", "Destino","Total oleadas", "Dist. (km)"] + col_olas 
         resumen = resumen[cols_finales]
 
         u_ola = (
