@@ -420,7 +420,7 @@ for _, row in top5_productos.iterrows():
     <div class="product-row">
         <div class="product-top">
             <span class="product-name">{nombre}</span>
-            <span class="product-value">{exceso:,.0f} u.</span>
+            <span class="product-value">{exceso:,.0f} uds.</span>
         </div>
 
         <div class="bar-track">
