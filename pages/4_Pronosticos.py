@@ -49,6 +49,10 @@ st.markdown(
     """
     <style>
         :root {
+            /* Mismo posicionamiento base que Inicio.py */
+            --rd-page-x: clamp(1rem, 1.9vw, 1.6rem);
+            --rd-page-top: clamp(1.4rem, 2vh, 2.2rem);
+
             --rd-card-bg: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
             --rd-card-border: 1.7px solid rgba(100, 116, 139, 0.52);
             --rd-card-border-hover: rgba(71, 85, 105, 0.62);
@@ -60,27 +64,29 @@ st.markdown(
         }
 
         .block-container {
-            /* Más aire superior para que el header fijo de Streamlit no corte el título */
-            padding-top: clamp(2.15rem, 3.2vh, 3.2rem) !important;
-            padding-bottom: clamp(0.8rem, 1.4vh, 1.2rem) !important;
-            padding-left: clamp(1rem, 1.9vw, 1.6rem) !important;
-            padding-right: clamp(1rem, 1.9vw, 1.6rem) !important;
             max-width: 100% !important;
+            padding-top: var(--rd-page-top) !important;
+            padding-bottom: clamp(0.8rem, 1.4vh, 1.2rem) !important;
+            padding-left: var(--rd-page-x) !important;
+            padding-right: var(--rd-page-x) !important;
         }
 
         h1, h2, h3, h4 {
             margin-top: 0 !important;
         }
 
-        .main-title {
-            color: #0f172a;
-            font-size: clamp(2rem, 3.35vw, 3.25rem);
-            font-weight: 950;
-            letter-spacing: clamp(-1.4px, -0.12vw, -0.7px);
-            margin: 0 0 clamp(0.55rem, 0.9vw, 0.85rem) 0;
-            line-height: 1.18;
-            padding-top: 0.08em;
-            overflow: visible;
+        .rd-main-title {
+            display: block;
+            overflow: visible !important;
+            color: #0f172a !important;
+            font-size: 44px !important;
+            font-weight: 950 !important;
+            letter-spacing: -1.2px !important;
+            line-height: 1.16 !important;
+            margin: 0 0 20px 0 !important;
+            padding: 6px 0 0 0 !important;
+            min-height: 58px !important;
+            white-space: normal !important;
         }
 
         .forecast-context {
@@ -101,7 +107,11 @@ st.markdown(
             gap: clamp(0.55rem, 0.85vw, 0.8rem) !important;
         }
 
-        div[data-testid="stMarkdownContainer"]:has(.main-title),
+        div[data-testid="stMarkdownContainer"]:has(.rd-main-title),
+        div[data-testid="stMarkdownContainer"]:has(.rd-main-title) * {
+            overflow: visible !important;
+        }
+
         div[data-testid="stMarkdownContainer"]:has(.forecast-context) {
             margin-bottom: 0 !important;
             padding-bottom: 0 !important;
@@ -259,9 +269,12 @@ st.markdown(
                 padding-top: 1.35rem !important;
             }
 
-            .main-title {
-                font-size: clamp(1.7rem, 8vw, 2.35rem);
-                margin-bottom: 0.55rem;
+            .rd-main-title {
+                font-size: 44px !important;
+                line-height: 1.16 !important;
+                min-height: 58px !important;
+                margin-bottom: 20px !important;
+                padding-top: 6px !important;
             }
 
             .forecast-context {
@@ -312,8 +325,12 @@ st.markdown(
                 padding-right: 0.55rem !important;
             }
 
-            .main-title {
-                font-size: clamp(1.45rem, 8.5vw, 2rem);
+            .rd-main-title {
+                font-size: 44px !important;
+                line-height: 1.16 !important;
+                min-height: 58px !important;
+                margin-bottom: 20px !important;
+                padding-top: 6px !important;
             }
 
             .forecast-context {
@@ -388,6 +405,8 @@ st.markdown(
 # =========================
 # Tarjeta compacta superior
 # =========================
+from html import escape
+
 def metric_card(title, value, description, badge, icon, accent, progress):
     title = escape(str(title))
     value = escape(str(value))
@@ -406,6 +425,7 @@ def metric_card(title, value, description, badge, icon, accent, progress):
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
 <style>
     html, body {{
         width: 100%;
@@ -423,27 +443,29 @@ def metric_card(title, value, description, badge, icon, accent, progress):
 
     :root {{
         --rd-card-bg: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        --rd-card-border: 1.7px solid rgba(100, 116, 139, 0.52);
-        --rd-card-border-hover: rgba(71, 85, 105, 0.62);
+        --rd-card-border: 2px solid rgba(100, 116, 139, 0.52);
+        --rd-card-border-hover: rgba(71, 85, 105, 0.68);
         --rd-card-radius: clamp(18px, 1.55vw, 24px);
-        --rd-inner-border: 1.4px solid rgba(100, 116, 139, 0.38);
-        --rd-card-shadow: 0 8px 24px rgba(15, 23, 42, 0.035);
+        --rd-inner-border: 1.5px solid rgba(100, 116, 139, 0.38);
+        --rd-card-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
     }}
 
     .metric-card {{
         position: relative;
         overflow: hidden;
         height: 100%;
-        min-height: 128px;
+        min-height: 132px;
         width: 100%;
         border-radius: var(--rd-card-radius);
-        padding: clamp(15px, 1.05vw, 19px) clamp(17px, 1.25vw, 23px) clamp(13px, 0.95vw, 17px);
+        padding: clamp(18px, 1.25vw, 24px) clamp(18px, 1.45vw, 28px);
         background: var(--rd-card-bg);
         border: var(--rd-card-border);
         box-shadow: var(--rd-card-shadow);
+
         display: flex;
         flex-direction: column;
         justify-content: center;
+        gap: clamp(8px, 0.65vw, 12px);
     }}
 
     .metric-card::before {{
@@ -452,7 +474,7 @@ def metric_card(title, value, description, badge, icon, accent, progress):
         top: 0;
         left: 0;
         width: 100%;
-        height: clamp(5px, 0.45vw, 7px);
+        height: clamp(5px, 0.42vw, 7px);
         background: var(--accent-color);
     }}
 
@@ -460,24 +482,37 @@ def metric_card(title, value, description, badge, icon, accent, progress):
         border-color: var(--rd-card-border-hover);
     }}
 
+    .metric-top {{
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        min-width: 0;
+        padding-top: 2px;
+    }}
+
     .metric-title {{
         color: #0f172a;
-        font-size: clamp(16px, 1.18vw, 20px);
+        font-size: clamp(16px, 1.05vw, 20px);
         font-weight: 950;
-        margin: 0 0 clamp(5px, 0.55vw, 8px) 0;
+        margin: 0;
         line-height: 1.1;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        min-width: 0;
+    }}
+
+    .metric-main {{
+        min-width: 0;
     }}
 
     .metric-value {{
         color: #0f172a;
-        font-size: clamp(34px, 2.65vw, 46px);
+        font-size: clamp(38px, 2.75vw, 54px);
         font-weight: 950;
-        line-height: 1;
-        letter-spacing: clamp(-1px, -0.08vw, -0.6px);
-        margin: 0 0 clamp(5px, 0.45vw, 8px) 0;
+        line-height: 0.92;
+        letter-spacing: -1.4px;
+        margin: 0 0 clamp(7px, 0.5vw, 10px) 0;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -485,43 +520,48 @@ def metric_card(title, value, description, badge, icon, accent, progress):
 
     .metric-description {{
         color: #64748b;
-        font-size: clamp(13px, 0.95vw, 16px);
-        font-weight: 750;
-        line-height: 1.24;
+        font-size: clamp(13.5px, 0.95vw, 17px);
+        font-weight: 850;
+        line-height: 1.15;
         margin: 0;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
+        white-space: nowrap;
         overflow: hidden;
+        text-overflow: ellipsis;
     }}
 
-    .metric-footer {{
+    .metric-bottom {{
         display: flex;
         align-items: center;
-        gap: clamp(7px, 0.65vw, 9px);
-        margin-top: clamp(7px, 0.6vw, 10px);
+        gap: clamp(10px, 0.9vw, 16px);
+        width: 100%;
         min-width: 0;
+        margin-top: 2px;
     }}
 
     .metric-badge {{
         color: #334155;
-        background: rgba(255, 255, 255, 0.9);
+        background: rgba(255, 255, 255, 0.94);
         border: var(--rd-inner-border);
         border-radius: 999px;
-        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.035);
-        padding: clamp(3px, 0.35vw, 5px) clamp(7px, 0.7vw, 10px);
-        font-size: clamp(10.5px, 0.78vw, 13px);
+        box-shadow: 0 5px 14px rgba(15, 23, 42, 0.04);
+        padding: clamp(5px, 0.42vw, 7px) clamp(10px, 0.8vw, 14px);
+        font-size: clamp(12px, 0.82vw, 15px);
         font-weight: 950;
+        line-height: 1;
         white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 0 0 auto;
+        max-width: 42%;
     }}
 
     .metric-track {{
         flex: 1;
-        min-width: 38px;
-        height: clamp(6px, 0.48vw, 8px);
+        height: clamp(8px, 0.55vw, 11px);
         border-radius: 999px;
         background: #e5e7eb;
         overflow: hidden;
+        min-width: 80px;
     }}
 
     .metric-fill {{
@@ -532,79 +572,73 @@ def metric_card(title, value, description, badge, icon, accent, progress):
     }}
 
     @media (max-width: 820px) {{
-        html, body {{
-            overflow: visible;
-        }}
-
         .metric-card {{
             min-height: 122px;
-            height: 100%;
-            border-radius: 14px;
-            padding: 13px 10px 10px;
+            border-radius: 15px;
+            padding: 16px 14px 14px;
+            gap: 8px;
         }}
 
         .metric-card::before {{
-            height: 4px;
+            height: 5px;
         }}
 
         .metric-title {{
-            font-size: clamp(11px, 2.2vw, 14px);
-            margin-bottom: 5px;
+            font-size: clamp(13px, 2.2vw, 16px);
         }}
 
         .metric-value {{
-            font-size: clamp(21px, 4.2vw, 28px);
-            white-space: normal;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
+            font-size: clamp(30px, 5vw, 40px);
         }}
 
         .metric-description {{
-            font-size: clamp(9.5px, 1.85vw, 12px);
-            line-height: 1.18;
+            font-size: clamp(11px, 2vw, 13.5px);
         }}
 
         .metric-badge {{
-            font-size: clamp(8.5px, 1.6vw, 10.5px);
-            padding: 3px 7px;
+            font-size: clamp(10px, 1.8vw, 12px);
+            padding: 5px 8px;
+            max-width: 46%;
+        }}
+
+        .metric-track {{
+            height: 7px;
         }}
     }}
 
     @media (max-width: 520px) {{
         .metric-card {{
             min-height: 112px;
-            height: 100%;
-            padding: 11px 7px 8px;
-            border-radius: 13px;
+            padding: 14px 12px 12px;
+            border-radius: 14px;
+            gap: 7px;
         }}
 
         .metric-title {{
-            font-size: clamp(9px, 2.1vw, 11px);
-            margin-bottom: 4px;
+            font-size: clamp(11px, 3vw, 13px);
         }}
 
         .metric-value {{
-            font-size: clamp(17px, 3.8vw, 22px);
-            margin-bottom: 4px;
+            font-size: clamp(25px, 7vw, 32px);
         }}
 
         .metric-description {{
-            font-size: clamp(8px, 1.75vw, 9.5px);
+            font-size: clamp(9.5px, 2.7vw, 11.5px);
         }}
 
-        .metric-footer {{
-            gap: 5px;
-            margin-top: 6px;
+        .metric-bottom {{
+            gap: 8px;
         }}
 
         .metric-badge {{
-            font-size: clamp(7px, 1.6vw, 8.5px);
-            padding: 2px 5px;
+            font-size: clamp(8.5px, 2.4vw, 10.5px);
+            padding: 4px 7px;
+            max-width: 50%;
         }}
 
         .metric-track {{
-            min-width: 24px;
+            height: 6px;
+            min-width: 55px;
         }}
     }}
 </style>
@@ -612,12 +646,20 @@ def metric_card(title, value, description, badge, icon, accent, progress):
 
 <body>
     <div class="metric-card" style="--accent-color: {accent};">
-        <p class="metric-title">{title}</p>
-        <p class="metric-value">{value}</p>
-        <p class="metric-description">{description}</p>
-        <div class="metric-footer">
+        <div class="metric-top">
+            <p class="metric-title">{title}</p>
+        </div>
+
+        <div class="metric-main">
+            <p class="metric-value">{value}</p>
+            <p class="metric-description">{description}</p>
+        </div>
+
+        <div class="metric-bottom">
             <span class="metric-badge">{icon} {badge}</span>
-            <div class="metric-track"><div class="metric-fill"></div></div>
+            <div class="metric-track">
+                <div class="metric-fill"></div>
+            </div>
         </div>
     </div>
 </body>
@@ -904,7 +946,7 @@ ctx_parts.append(f"{horizon} meses")
 ctx_str = "  ·  ".join(ctx_parts)
 
 st.markdown(
-    f'<h1 class="main-title">Panel de Pronósticos</h1>'
+    f'<div class="rd-main-title">Panel de Pronósticos</div>'
     f'<p class="forecast-context">{escape(str(region_label))}  ·  {escape(str(ctx_str))}</p>',
     unsafe_allow_html=True
 )
