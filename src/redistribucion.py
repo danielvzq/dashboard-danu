@@ -1,10 +1,4 @@
 # src/redistribucion.py
-# ══════════════════════════════════════════════════════════════════════
-# DANUStore — Lógica de Redistribución de Inventario
-# Oleadas bisemanales proporcionales al forecast Prophet
-# Nivel de producto: se manda el producto más débil de cada subcat+región
-# Fechas: los 3 meses reales del forecast (no desde hoy)
-# ══════════════════════════════════════════════════════════════════════
 
 import numpy as np
 import pandas as pd
@@ -13,10 +7,7 @@ import streamlit as st
 from datetime import date
 from dateutil.relativedelta import relativedelta
 
-
-# ══════════════════════════════════════════════════════════════════════
 # CONSTANTES GEOGRÁFICAS
-# ══════════════════════════════════════════════════════════════════════
 
 REGION_COORDS: dict[str, dict] = {
     "bajío":                               {"lat": 20.88, "lon": -101.07, "city": "León"},
@@ -54,10 +45,7 @@ GEO_LAYOUT = dict(
     lataxis=dict(range=[14.0,   33.5]),
 )
 
-
-# ══════════════════════════════════════════════════════════════════════
 # UTILIDADES
-# ══════════════════════════════════════════════════════════════════════
 
 def haversine(lat1, lon1, lat2, lon2) -> int:
     R = 6371
@@ -81,18 +69,7 @@ def get_forecast_dates(df_master: pd.DataFrame, horizon: int) -> list[date]:
 
 
 def _ensure_overstock_cols(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Garantiza que el DataFrame tenga Excess_stock, Excedente y Gap_pct.
 
-    Prioridad de fuente:
-    1. Si ya existen (vienen de load_data()) → no hace nada.
-    2. Si existe "Sobrestock crítico por MES" → la usa directamente.
-    3. Fallback: Stock − Units_expected (proxy anterior).
-
-    Excess_stock : sobrestock absoluto del mes  = Sobrestock MES
-    Excedente    : presión acumulada (puede ser negativa)
-    Gap_pct      : Excess_stock / Stock × 100
-    """
     df = df.copy()
 
     # ── Excess_stock ──────────────────────────────────────────────────
@@ -124,39 +101,14 @@ def _ensure_overstock_cols(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
-
-# ══════════════════════════════════════════════════════════════════════
 # PASO 1 — CLASIFICAR REGIONES: ORIGEN / DESTINO / EQUILIBRIO
-# ══════════════════════════════════════════════════════════════════════
 
 def build_redist_base(
     df_master: pd.DataFrame,
     subcat_region_forecast: dict[tuple[str, str], float],
     horizon: int = 3,
 ) -> pd.DataFrame:
-    """
-    Clasifica cada (Región, Subcategoría) como ORIGEN, DESTINO o Equilibrio.
 
-    Métricas usadas
-    ---------------
-    Avg_excess   : promedio mensual de "Sobrestock crítico por MES"
-                   = sobrestock real con buffer de ventas (Stock − Units_sold×1.2)
-                   Antes se usaba Stock − Units_expected, que subestimaba
-                   el sobrestock en ~7.6× al no considerar el buffer de ventas.
-
-    Avg_excedente: promedio del Excedente acumulado (solo positivos)
-                   Captura la TENDENCIA: valores altos → sobrestock creciente.
-
-    Gap_pct      : Excess_stock / Stock × 100
-                   % del inventario que está por encima de la demanda + buffer.
-                   Rango típico: 68 % – 96 % (antes era 7 % con el proxy antiguo).
-
-    Score_origen  = Gap_pct / Forecast_avg_mensual
-                   Alto Gap_pct y baja demanda → candidato fuerte a origen.
-
-    Score_destino = Forecast_avg / Avg_excess
-                   Alta demanda y bajo exceso propio → candidato fuerte a destino.
-    """
     df = _ensure_overstock_cols(df_master)
 
     region_sub = (
@@ -214,10 +166,7 @@ def build_redist_base(
     redist["Rol"] = redist.apply(rol, axis=1)
     return redist
 
-
-# ══════════════════════════════════════════════════════════════════════
 # PASO 2 — FORECAST MENSUAL DETALLADO
-# ══════════════════════════════════════════════════════════════════════
 
 @st.cache_data(show_spinner=False)
 def build_monthly_forecast(horizon: int) -> pd.DataFrame:
@@ -246,10 +195,7 @@ def build_monthly_forecast(horizon: int) -> pd.DataFrame:
                 })
     return pd.DataFrame(rows)
 
-
-# ══════════════════════════════════════════════════════════════════════
 # PASO 3 — PLAN DE OLEADAS A NIVEL PRODUCTO
-# ══════════════════════════════════════════════════════════════════════
 
 def build_wave_plan(
     df_master:   pd.DataFrame,
@@ -257,32 +203,7 @@ def build_wave_plan(
     fc_monthly:  pd.DataFrame,
     horizon:     int = 3,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Genera el plan de transferencias a nivel PRODUCTO con 6 oleadas.
 
-    Lógica de selección de producto más débil
-    ------------------------------------------
-    Se usa el último mes disponible y se ordena por Gap_pct DESC
-    (mayor porcentaje de sobrestock sobre el stock total).
-    Gap_pct = Excess_stock / Stock × 100, donde Excess_stock = Sobrestock MES
-    (no el proxy anterior Stock − Units_expected).
-
-    Lógica del volumen a transferir
-    --------------------------------
-    Total_transferir = min(
-        Excedente_acumulado_positivo × 0.80,   ← presión real de sobrestock creciente
-        Sobrestock_MES_ultimo × 0.80,           ← techo: nivel absoluto de sobrestock
-        Forecast_total_destino × 0.60           ← cap: no saturar el destino
-    )
-
-    Por qué dos fuentes de exceso:
-    • Excedente (acumulado) captura la TENDENCIA: si crece mes a mes, la
-      urgencia de transferir es mayor que si el sobrestock es estable.
-    • Sobrestock MES (absoluto) evita transferir más de lo que el origen
-      tiene físicamente en exceso ese mes.
-    • El cap del 60 % del forecast del destino protege contra saturar
-      regiones que ya tienen demanda proyectada.
-    """
     df = _ensure_overstock_cols(df_master)
 
     # Fechas reales del forecast (días 1 y 15 de cada mes pronosticado)
@@ -319,7 +240,7 @@ def build_wave_plan(
         .reset_index()
     )
 
-    # ── Pares ORIGEN → DESTINO ────────────────────────────────────────
+    # ── Pares ORIGEN → DESTINO 
     origenes = redist_base[redist_base["Rol"] == "ORIGEN"][
         ["Region", "Category", "Subcategory", "Avg_excess", "Avg_excedente", "Gap_pct"]
     ].copy()
@@ -351,13 +272,7 @@ def build_wave_plan(
         how="left",
     )
 
-    # ── Total a transferir ────────────────────────────────────────────
-    # Base 1: Excedente acumulado positivo × 80 %
-    #   Refleja la PRESIÓN de sobrestock creciente; si el excedente
-    #   es negativo (sobrestock bajando) usa 0 para ese producto.
-    # Base 2: Sobrestock MES × 80 %
-    #   Techo físico: no se puede transferir más de lo que hay en sobrestock.
-    # Cap: 60 % de la demanda forecast del destino (no saturar).
+    # ── Total a transferir 
     pares["Forecast_total_h"]  = pares["Forecast_avg"] * horizon
     pares["Total_transferir"]  = pares.apply(
         lambda r: max(int(min(
@@ -378,7 +293,7 @@ def build_wave_plan(
         ), axis=1
     )
 
-    # ── Generar oleadas ───────────────────────────────────────────────
+    #  Generar oleadas 
     plan_rows = []
     for _, par in pares.iterrows():
         subcat  = par["Subcategory"]
@@ -456,10 +371,7 @@ def build_wave_plan(
 
     return pares, plan_df
 
-
-# ══════════════════════════════════════════════════════════════════════
 # TRAZAS DEL MAPA — un frame por oleada (6 frames fijos)
-# ══════════════════════════════════════════════════════════════════════
 
 def build_animation_frames(
     plan_df: pd.DataFrame,
@@ -579,10 +491,7 @@ def build_animation_frames(
 
     return frames, slider_steps, init_nodes, [init_route], init_annotation, len(ordered)
 
-
-# ══════════════════════════════════════════════════════════════════════
 # NODOS DEL MAPA
-# ══════════════════════════════════════════════════════════════════════
 
 def _make_nodes(active_origins: set, active_dests: set) -> go.Scattergeo:
     regions = list(REGION_COORDS.keys())

@@ -900,7 +900,7 @@ if df_filtrado.empty:
     st.warning("No hay datos para los filtros seleccionados.")
     st.stop()
 
-region_prophet = region_sel if region_sel != "Todas" else df_maestra["Region"].mode()[0]
+region_prophet = region_sel if region_sel != "Todas" else None
 subcat_prophet = subcat_sel if subcat_sel != "Todas" else None
 region_label   = REG_LABEL.get(region_sel, region_sel) if region_sel != "Todas" else "Todas las regiones"
 ref15, ref25   = period_thresholds(horizon)
@@ -1119,16 +1119,19 @@ with col_acc:
 
     st.plotly_chart(fig_gauge, use_container_width=True, config={"displayModeBar": False, "responsive": True})
 
-# ─────────────────────────────────────────────────────────────────────
+
 # TAB 2 — ANÁLISIS
-# ─────────────────────────────────────────────────────────────────────
+
 with tab_analisis:
 
     if product_sel != "Todas":
         @st.cache_data(show_spinner=False)
         def fit_prophet_product(product_name, region, periods):
             df   = load_data()
-            mask = (df["Product_name"]==product_name) & (df["Region"]==region)
+            if region is None:
+                mask = df["Product_name"] == product_name
+            else:
+                mask = (df["Product_name"]==product_name) & (df["Region"]==region)
             sub  = df[mask].groupby("YearMonth").agg(y=("Units_sold","sum")).reset_index()
             if len(sub) < 6: return None, None
             sub["ds"] = sub["YearMonth"].dt.to_timestamp()
@@ -1314,9 +1317,8 @@ with tab_analisis:
         st.plotly_chart(fig_comp, use_container_width=True, config={"displayModeBar": False, "responsive": True})
 
 
-# ─────────────────────────────────────────────────────────────────────
 # TAB 3 — REDISTRIBUCIÓN
-# ─────────────────────────────────────────────────────────────────────
+
 with tab_redist:
 
     col_th, col_p1, col_toggle = st.columns([3, 1, 2])
